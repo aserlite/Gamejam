@@ -17,7 +17,7 @@ export class DebugDisplay {
     }
 
     render(ctx, mouseState, camera, cellSize) {
-        const alpha = this.enabled ? 1.0 : 0.15;
+        const alpha = this.enabled ? 1.0 : 0;
 
         const worldPos = camera.screenToWorld(mouseState.screenX, mouseState.screenY);
         
@@ -27,7 +27,7 @@ export class DebugDisplay {
         let lines = [
             `Cell: (${cellX}, ${cellY})`,
             `Zoom: ${camera.zoom.toFixed(2)}x`,
-            `Cacher debug: Touche D`,
+            `Cacher debug: Touche H`,
         ];
 
         for (const [key, value] of Object.entries(this.customData)) {

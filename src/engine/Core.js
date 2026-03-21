@@ -1,7 +1,6 @@
 import { Camera } from './Camera.js';
 import { InputManager } from './InputManager.js';
 import { DebugDisplay } from './DebugDisplay.js';
-import { ColorPalette } from './ColorPalette.js';
 import { Grid, CHUNK_SIZE } from './Grid.js';
 import { TimeControl } from './TimeControl.js';
 import { Profiler } from './Profiler.js';
@@ -16,7 +15,6 @@ export class Core {
         this.camera = new Camera();
         this.inputManager = new InputManager(this.canvas, this.camera, this);
         this.debugDisplay = new DebugDisplay();
-        this.colorPalette = new ColorPalette();
         this.grid = new Grid();
         
         this.timeControl = new TimeControl();
@@ -39,9 +37,6 @@ export class Core {
         this.resetProject = this.resetProject.bind(this);
         this.handleKeyDown = this.handleKeyDown.bind(this);
 
-        this.colorPalette.enabled = true;
-        this.colorPalette.isOpen = true;
-
         window.addEventListener('resize', this.resize);
         window.addEventListener('keydown', this.handleKeyDown);
         
@@ -49,25 +44,15 @@ export class Core {
     }
 
     handleKeyDown(e) {
-        if (e.key === 'd' || e.key === 'D') {
+        if (e.key === 'h' || e.key === 'H') {
             this.uiVisible = !this.uiVisible;
             this.debugDisplay.enabled = this.uiVisible;
-        }
-        if (e.key === 'c' || e.key === 'C') {
-            this.colorPalette.toggle();
         }
         if (e.key === 's' || e.key === 'S') {
             this.shareProject();
         }
-        if (e.key === 'r' || e.key === 'R') {
+        if (e.key === 'Backspace' || e.key === 'Delete') {
             this.resetProject();
-        }
-        if (e.key === 'Escape') {
-            this.quitToMenu();
-        }
-        if (e.code === 'Space') {
-            this.timeControl.togglePause();
-            e.preventDefault(); 
         }
         if (e.key === 'n' || e.key === 'N') {
             this.timeControl.step();
@@ -109,8 +94,7 @@ export class Core {
         }
 
         this.debugDisplay.setCustomData('Partage', 'Touche S');
-        this.debugDisplay.setCustomData('Reset', 'Touche R');
-        this.debugDisplay.setCustomData('Quitter', 'Échap');
+        this.debugDisplay.setCustomData('Reset', 'Touche Backspace/Delete');
         this.debugDisplay.setCustomData('Step', 'Touche N');
         
         this.resize();
@@ -119,16 +103,19 @@ export class Core {
     resetProject() {
         if (!this.project) return;
         
-        const confirmReset = window.confirm("Voulez-vous vraiment réinitialiser ?\nTout votre dessin sera perdu.");
+        const confirmReset = window.confirm("Voulez-vous vraiment réinitialiser le monde entier ?\n(Cette action est irréversible, vous perdrez votre île et votre matériel)");
         
         if (!confirmReset) {
             return;
         }
 
         this.grid.chunks.clear();
-        
         this.storageManager.clear();
         
+        if (this.project.onReset) {
+            this.project.onReset();
+        }
+
         const url = new URL(window.location.href);
         if (url.searchParams.has('d')) {
             url.searchParams.delete('d');
@@ -218,21 +205,16 @@ export class Core {
                 const chunk = this.grid.getChunk(cx, cy);
                 if (!chunk) continue;
 
-                for (const [key, data] of chunk.cells.entries()) {
-                    const [localX, localY] = key.split(',').map(Number);
-                    const cellX = chunk.x * CHUNK_SIZE + localX;
-                    const cellY = chunk.y * CHUNK_SIZE + localY;
-                    
-                    if (data.texture) {
-                        const img = this.textureManager.getTexture(data.texture);
-                        if (img) {
-                             this.ctx.drawImage(img, cellX * this.cellSize, cellY * this.cellSize, this.cellSize, this.cellSize);
-                             continue;
-                        }
-                    }
+                if (chunk.isDirty || !chunk.canvas) {
+                    chunk.renderToCache(this.cellSize, this.textureManager);
+                }
 
-                    this.ctx.fillStyle = data.color || '#fff';
-                    this.ctx.fillRect(cellX * this.cellSize, cellY * this.cellSize, this.cellSize, this.cellSize);
+                if (chunk.canvas) {
+                    this.ctx.drawImage(
+                        chunk.canvas,
+                        chunk.x * CHUNK_SIZE * this.cellSize,
+                        chunk.y * CHUNK_SIZE * this.cellSize
+                    );
                 }
             }
         }
@@ -314,7 +296,7 @@ export class Core {
         this.ctx.restore();
         this.profiler.endRender();
 
-        const alpha = this.uiVisible ? 1.0 : 0.15;
+        const alpha = this.uiVisible ? 1.0 : 0;
 
         this.debugDisplay.render(this.ctx, this.inputManager.mouseState, this.camera, this.cellSize);
         
@@ -322,11 +304,8 @@ export class Core {
         this.ctx.globalAlpha = alpha;
         
         this.profiler.render(this.ctx, this.grid);
-        this.timeControl.render(this.ctx);
         
         this.ctx.restore();
-
-        this.colorPalette.render(this.ctx);
 
         this.animationFrameId = requestAnimationFrame(this.loop);
     }

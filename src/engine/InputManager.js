@@ -14,6 +14,11 @@ export class InputManager {
             lastScreenY: 0,     
         };
 
+        this.keys = {};
+
+        this.onKeyDown = this.onKeyDown.bind(this);
+        this.onKeyUp = this.onKeyUp.bind(this);
+
         this.onMouseDown = this.onMouseDown.bind(this);
         this.onMouseUp = this.onMouseUp.bind(this);
         this.onMouseMove = this.onMouseMove.bind(this);
@@ -23,6 +28,20 @@ export class InputManager {
         window.addEventListener('mouseup', this.onMouseUp);
         this.canvas.addEventListener('mousemove', this.onMouseMove);
         this.canvas.addEventListener('wheel', this.onWheel, { passive: false });
+        window.addEventListener('keydown', this.onKeyDown);
+        window.addEventListener('keyup', this.onKeyUp);
+    }
+
+    onKeyDown(event) {
+        this.keys[event.code] = true;
+    }
+
+    onKeyUp(event) {
+        this.keys[event.code] = false;
+    }
+
+    isKeyDown(code) {
+        return !!this.keys[code];
     }
 
     onMouseDown(event) {
@@ -31,13 +50,6 @@ export class InputManager {
         if (this.engine.colorPalette && this.engine.colorPalette.isOpen) {
             const isPaletteClick = this.engine.colorPalette.handleClick(event.clientX, event.clientY);
             if (isPaletteClick) return;
-        }
-
-        if (this.engine.timeControl && this.engine.uiVisible) {
-            const isTimeControlClick = this.engine.timeControl.handleMouseDown(
-                event.clientX, event.clientY, this.canvas.width, this.canvas.height
-            );
-            if (isTimeControlClick) return;
         }
 
         this.mouseState.isDown = true;
@@ -54,10 +66,6 @@ export class InputManager {
     onMouseUp(event) {
         if (event.button !== 0) return;
 
-        if (this.engine.timeControl) {
-            this.engine.timeControl.handleMouseUp();
-        }
-
         this.mouseState.isDown = false;
         this.mouseState.isPanning = false;
         this.mouseState.isEditing = false;
@@ -66,13 +74,6 @@ export class InputManager {
     onMouseMove(event) {
         this.mouseState.screenX = event.clientX;
         this.mouseState.screenY = event.clientY;
-
-        if (this.engine.timeControl && this.engine.timeControl.isDraggingSlider) {
-            this.engine.timeControl.handleMouseMove(
-                event.clientX, event.clientY, this.canvas.width, this.canvas.height
-            );
-            return;
-        }
 
         if (this.mouseState.isPanning) {
             const dx = event.clientX - this.mouseState.lastScreenX;
@@ -113,5 +114,7 @@ export class InputManager {
         window.removeEventListener('mouseup', this.onMouseUp);
         this.canvas.removeEventListener('mousemove', this.onMouseMove);
         this.canvas.removeEventListener('wheel', this.onWheel);
+        window.removeEventListener('keydown', this.onKeyDown);
+        window.removeEventListener('keyup', this.onKeyUp);
     }
 }

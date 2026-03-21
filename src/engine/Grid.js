@@ -5,6 +5,9 @@ class Chunk {
         this.x = chunkX;
         this.y = chunkY;
         this.cells = new Map();
+        this.isDirty = true;
+        this.canvas = null;
+        this.ctx = null;
     }
 
     _getCellKey(localX, localY) {
@@ -17,10 +20,47 @@ class Chunk {
         } else {
             this.cells.set(this._getCellKey(localX, localY), data);
         }
+        this.isDirty = true;
     }
 
     getCell(localX, localY) {
         return this.cells.get(this._getCellKey(localX, localY));
+    }
+
+    renderToCache(cellSize, textureManager) {
+        const size = CHUNK_SIZE * cellSize;
+        if (!this.canvas) {
+            if (typeof OffscreenCanvas !== 'undefined') {
+                this.canvas = new OffscreenCanvas(size, size);
+            } else {
+                this.canvas = document.createElement('canvas');
+                this.canvas.width = size;
+                this.canvas.height = size;
+            }
+            this.ctx = this.canvas.getContext('2d', { alpha: true });
+        } else if (this.canvas.width !== size) {
+            this.canvas.width = size;
+            this.canvas.height = size;
+        }
+
+        this.ctx.clearRect(0, 0, size, size);
+
+        for (const [key, data] of this.cells.entries()) {
+            const [localX, localY] = key.split(',').map(Number);
+            
+            if (data.texture) {
+                const img = textureManager.getTexture(data.texture);
+                if (img) {
+                    this.ctx.drawImage(img, localX * cellSize, localY * cellSize, cellSize, cellSize);
+                    continue;
+                }
+            }
+            
+            this.ctx.fillStyle = data.color || '#fff';
+            this.ctx.fillRect(localX * cellSize, localY * cellSize, cellSize, cellSize);
+        }
+
+        this.isDirty = false;
     }
 }
 
@@ -80,10 +120,15 @@ export class Grid {
 
             const cellsArray = [];
             for (const [localKey, cellData] of chunk.cells.entries()) {
-                cellsArray.push({
-                    k: localKey,
-                    d: cellData
-                });
+                let cellOutput = { k: localKey };
+                if (cellData && cellData.id) {
+                    cellOutput.i = cellData.id;
+                } else if (cellData && cellData.color && Object.keys(cellData).length === 1) {
+                    cellOutput.c = cellData.color;
+                } else {
+                    cellOutput.d = cellData;
+                }
+                cellsArray.push(cellOutput);
             }
 
             data.push({
@@ -107,7 +152,19 @@ export class Grid {
             for (const chunkData of data) {
                 const chunk = new Chunk(chunkData.x, chunkData.y);
                 for (const cell of chunkData.c) {
-                    chunk.cells.set(cell.k, cell.d);
+                    let cellData = cell.d;
+                    if (cell.i) {
+                        if (window.BLOCKS && window.BLOCKS[cell.i]) {
+                            cellData = window.BLOCKS[cell.i];
+                        } else {
+                            cellData = { id: cell.i }; // fallback
+                        }
+                    } else if (cell.c) {
+                        cellData = { color: cell.c };
+                    }
+                    if (cellData) {
+                        chunk.cells.set(cell.k, cellData);
+                    }
                 }
                 this.chunks.set(this._getChunkKey(chunk.x, chunk.y), chunk);
             }
