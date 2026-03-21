@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MoteurVroum</title>
+    <link rel="icon" type="image/svg+xml" href="/icon.webp" />
+    <style>
+      :root {
+        --bg-color: #121212;
+        --surface-color: #1e1e1e;
+        --primary-color: #00ff88;
+        --text-color: #e0e0e0;
+        --border-color: #333;
+      }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      #app {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: radial-gradient(circle at center, #2a2a2a 0%, #121212 100%);
+      }
+
+      #project-selector {
+        background-color: var(--surface-color);
+        padding: 3rem;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        text-align: center;
+        border: 1px solid var(--border-color);
+        max-width: 600px;
+        width: 90%;
+      }
+
+      #project-selector h1 {
+        margin-top: 0;
+        margin-bottom: 2rem;
+        font-size: 2.5rem;
+        font-weight: 300;
+        letter-spacing: 2px;
+        color: #fff;
+      }
+
+      #project-selector h1 span {
+        color: var(--primary-color);
+        font-weight: 600;
+      }
+
+      #project-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+      }
+
+      #project-list button {
+        background: transparent;
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+        padding: 1.2rem;
+        font-size: 1.1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      #project-list button::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: var(--primary-color);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        z-index: 0;
+      }
+
+      #project-list button span {
+        position: relative;
+        z-index: 1;
+      }
+
+      #project-list button:hover {
+        border-color: var(--primary-color);
+        color: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 255, 136, 0.2);
+      }
+
+      canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+    </div>
+    <canvas id="engine-canvas" style="display: none;"></canvas>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
