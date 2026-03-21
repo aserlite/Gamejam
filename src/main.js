@@ -28,6 +28,31 @@ class IslandCrafter {
 
         this.handleKeyDown = this.handleKeyDown.bind(this);
         window.addEventListener('keydown', this.handleKeyDown);
+
+        this.playerLightSprite = this.createLightSprite(200, [
+            { pos: 0, color: 'rgba(255,255,255,1)' },
+            { pos: 1, color: 'rgba(255,255,255,0)' }
+        ]);
+
+        this.campfireLightSprite = this.createLightSprite(600, [
+            { pos: 0, color: 'rgba(255,255,255,1)' },
+            { pos: 0.3, color: 'rgba(255,255,255,0.85)' },
+            { pos: 1, color: 'rgba(255,255,255,0)' }
+        ]);
+    }
+
+    createLightSprite(radius, stops) {
+        const c = document.createElement('canvas');
+        c.width = radius * 2;
+        c.height = radius * 2;
+        const ctx = c.getContext('2d');
+        const grd = ctx.createRadialGradient(radius, radius, 0, radius, radius, radius);
+        for (let s of stops) {
+            grd.addColorStop(s.pos, s.color);
+        }
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, 0, radius * 2, radius * 2);
+        return c;
     }
 
     onReset() {
@@ -565,13 +590,7 @@ class IslandCrafter {
             const py = (this.player.y * z) + camera.y + (ph * z) / 2;
             const prd = 120 * z;
             
-            const grd = this.lightingCtx.createRadialGradient(px, py, 0, px, py, prd);
-            grd.addColorStop(0, 'rgba(255,255,255,1)');
-            grd.addColorStop(1, 'rgba(255,255,255,0)');
-            this.lightingCtx.fillStyle = grd;
-            this.lightingCtx.beginPath();
-            this.lightingCtx.arc(px, py, prd, 0, Math.PI * 2);
-            this.lightingCtx.fill();
+            this.lightingCtx.drawImage(this.playerLightSprite, px - prd, py - prd, prd * 2, prd * 2);
 
             for (const peerId in this.remotePlayers) {
                 const rp = this.remotePlayers[peerId];
@@ -579,13 +598,7 @@ class IslandCrafter {
                 const rph = rp.height || cs;
                 const rpx = (rp.x * z) + camera.x + (rpw * z) / 2;
                 const rpy = (rp.y * z) + camera.y + (rph * z) / 2;
-                const rgrd = this.lightingCtx.createRadialGradient(rpx, rpy, 0, rpx, rpy, prd);
-                rgrd.addColorStop(0, 'rgba(255,255,255,1)');
-                rgrd.addColorStop(1, 'rgba(255,255,255,0)');
-                this.lightingCtx.fillStyle = rgrd;
-                this.lightingCtx.beginPath();
-                this.lightingCtx.arc(rpx, rpy, prd, 0, Math.PI * 2);
-                this.lightingCtx.fill();
+                this.lightingCtx.drawImage(this.playerLightSprite, rpx - prd, rpy - prd, prd * 2, prd * 2);
             }
 
             for (let x = view.startCol; x <= view.endCol; x++) {
@@ -595,15 +608,8 @@ class IslandCrafter {
                         const cx = (x * cs * z) + camera.x + (cs * z) / 2;
                         const cy = (y * cs * z) + camera.y + (cs * z) / 2;
                         const crd = 280 * z;
-
-                        const cgrd = this.lightingCtx.createRadialGradient(cx, cy, 0, cx, cy, crd);
-                        cgrd.addColorStop(0, 'rgba(255,255,255,1)');
-                        cgrd.addColorStop(0.3, 'rgba(255,255,255,0.85)');
-                        cgrd.addColorStop(1, 'rgba(255,255,255,0)');
-                        this.lightingCtx.fillStyle = cgrd;
-                        this.lightingCtx.beginPath();
-                        this.lightingCtx.arc(cx, cy, crd, 0, Math.PI * 2);
-                        this.lightingCtx.fill();
+                        
+                        this.lightingCtx.drawImage(this.campfireLightSprite, cx - crd, cy - crd, crd * 2, crd * 2);
                     }
                 }
             }
