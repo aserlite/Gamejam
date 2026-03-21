@@ -138,6 +138,7 @@ export class UIManager {
 
     setupLobbyHooks(dataLoaded) {
         document.getElementById('btn-solo').addEventListener('click', () => {
+            this.app.network.isHost = true;
             if (!dataLoaded) generateIsland(this.app.engine);
             this.app.startGameProcess(false);
         });

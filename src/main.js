@@ -18,6 +18,9 @@ class IslandCrafter {
         this.targetHarvestX = -1;
         this.targetHarvestY = -1;
 
+        this.dayTime = 0;
+        this.dayDuration = 60.0;
+
         this.engine = null;
         this.network = new NetworkManager();
         this.remotePlayers = {};
@@ -79,6 +82,51 @@ class IslandCrafter {
                 this.engine.grid.chunks.clear(); 
                 this.engine.grid.deserialize(mapPayload);
                 this.startGameProcess(true);
+            }
+        };
+
+        this.network.onMessageReceived = (peerId, message) => {
+            switch (message.type) {
+                case 'requestWorldData':
+                    if (this.network.isHost) {
+                        const serializedGrid = this.engine.grid.serialize();
+                        this.network.broadcast({
+                            type: 'worldData',
+                            payload: { grid: serializedGrid, dayTime: this.dayTime }
+                        }, [peerId]);
+                    }
+                    break;
+                case 'worldData':
+                    if (!this.network.isHost) {
+                        this.engine.grid.deserialize(message.payload.grid);
+                        if (message.payload.dayTime !== undefined) this.dayTime = message.payload.dayTime;
+                        this.ui.showLobby(true);
+                    }
+                    break;
+                case 'playerSync':
+                    if (peerId === this.network.peerId) return;
+                    let remotePlayer = this.remotePlayers[peerId];
+                    if (!remotePlayer) {
+                        remotePlayer = new Player(message.payload.x, message.payload.y);
+                        this.remotePlayers[peerId] = remotePlayer;
+                        remotePlayer.color = '#e74c3c';
+                    }
+                    remotePlayer.x = message.payload.x;
+                    remotePlayer.y = message.payload.y;
+                    remotePlayer.facingX = message.payload.facingX;
+                    remotePlayer.facingY = message.payload.facingY;
+                    if (!this.network.isHost && message.payload.dayTime !== undefined) {
+                        this.dayTime = message.payload.dayTime;
+                    }
+                    break;
+                case 'action':
+                    const { action, x, y, blockId } = message.payload;
+                    if (action === 'placeBlock' && BLOCKS[blockId]) {
+                        this.engine.grid.setCell(x, y, BLOCKS[blockId]);
+                    }
+                    break;
+                default:
+                    console.log(`Unknown message type: ${message.type}`);
             }
         };
 
@@ -388,6 +436,14 @@ class IslandCrafter {
                 this.savePlayer();
                 this.ui.updateHUD();
             }
+            if (this.network.isHost) {
+                this.dayTime += dt / this.dayDuration;
+                if (this.dayTime >= 1) this.dayTime -= 1;
+            }
+            
+            const hours = Math.floor((this.dayTime * 24 + 12) % 24);
+            const minutes = Math.floor((((this.dayTime * 24 + 12) % 24) % 1) * 60);
+            engine.debugDisplay.setCustomData('Heure', `${hours.toString().padStart(2, '0')}h${minutes.toString().padStart(2, '0')}`);
 
             this.networkSyncTimer = (this.networkSyncTimer || 0) + dt;
             if (this.networkSyncTimer > 0.05) {
@@ -395,12 +451,13 @@ class IslandCrafter {
                     this.player.facingX !== this.lastSentFacingX || this.player.facingY !== this.lastSentFacingY) {
                     
                     this.network.broadcast({
-                        type: 'playerMoved',
+                        type: 'playerSync',
                         payload: {
                             x: this.player.x,
                             y: this.player.y,
                             facingX: this.player.facingX,
-                            facingY: this.player.facingY
+                            facingY: this.player.facingY,
+                            dayTime: this.network.isHost ? this.dayTime : undefined
                         }
                     }, []);
                     
@@ -475,6 +532,88 @@ class IslandCrafter {
             ctx.fillRect(px, py - 10, this.engine.cellSize, 8);
             ctx.fillStyle = '#2ecc71';
             ctx.fillRect(px + 1, py - 9, (this.engine.cellSize - 2) * progress, 6);
+        }
+
+        let darkness = Math.max(0, Math.sin((this.dayTime - 0.25) * Math.PI * 2)) * 0.9;
+        
+        if (this.player.x > 200000) {
+            darkness = 0;
+        }
+
+        if (darkness > 0.02) {
+            if (!this.lightingCanvas) {
+                this.lightingCanvas = document.createElement('canvas');
+                this.lightingCtx = this.lightingCanvas.getContext('2d', { alpha: true });
+            }
+            if (this.lightingCanvas.width !== this.engine.canvas.width || this.lightingCanvas.height !== this.engine.canvas.height) {
+                this.lightingCanvas.width = this.engine.canvas.width;
+                this.lightingCanvas.height = this.engine.canvas.height;
+            }
+
+            this.lightingCtx.clearRect(0, 0, this.lightingCanvas.width, this.lightingCanvas.height);
+            this.lightingCtx.fillStyle = `rgba(5, 5, 20, ${darkness})`;
+            this.lightingCtx.fillRect(0, 0, this.lightingCanvas.width, this.lightingCanvas.height);
+
+            this.lightingCtx.globalCompositeOperation = 'destination-out';
+
+            const cs = this.engine.cellSize;
+            const z = camera.zoom;
+            
+            const pw = this.player.width || cs;
+            const ph = this.player.height || cs;
+            const px = (this.player.x * z) + camera.x + (pw * z) / 2;
+            const py = (this.player.y * z) + camera.y + (ph * z) / 2;
+            const prd = 120 * z;
+            
+            const grd = this.lightingCtx.createRadialGradient(px, py, 0, px, py, prd);
+            grd.addColorStop(0, 'rgba(255,255,255,1)');
+            grd.addColorStop(1, 'rgba(255,255,255,0)');
+            this.lightingCtx.fillStyle = grd;
+            this.lightingCtx.beginPath();
+            this.lightingCtx.arc(px, py, prd, 0, Math.PI * 2);
+            this.lightingCtx.fill();
+
+            for (const peerId in this.remotePlayers) {
+                const rp = this.remotePlayers[peerId];
+                const rpw = rp.width || cs;
+                const rph = rp.height || cs;
+                const rpx = (rp.x * z) + camera.x + (rpw * z) / 2;
+                const rpy = (rp.y * z) + camera.y + (rph * z) / 2;
+                const rgrd = this.lightingCtx.createRadialGradient(rpx, rpy, 0, rpx, rpy, prd);
+                rgrd.addColorStop(0, 'rgba(255,255,255,1)');
+                rgrd.addColorStop(1, 'rgba(255,255,255,0)');
+                this.lightingCtx.fillStyle = rgrd;
+                this.lightingCtx.beginPath();
+                this.lightingCtx.arc(rpx, rpy, prd, 0, Math.PI * 2);
+                this.lightingCtx.fill();
+            }
+
+            for (let x = view.startCol; x <= view.endCol; x++) {
+                for (let y = view.startRow; y <= view.endRow; y++) {
+                    const c = this.engine.grid.getCell(x, y);
+                    if (c && c.id === 'campfire') {
+                        const cx = (x * cs * z) + camera.x + (cs * z) / 2;
+                        const cy = (y * cs * z) + camera.y + (cs * z) / 2;
+                        const crd = 280 * z;
+
+                        const cgrd = this.lightingCtx.createRadialGradient(cx, cy, 0, cx, cy, crd);
+                        cgrd.addColorStop(0, 'rgba(255,255,255,1)');
+                        cgrd.addColorStop(0.3, 'rgba(255,255,255,0.85)');
+                        cgrd.addColorStop(1, 'rgba(255,255,255,0)');
+                        this.lightingCtx.fillStyle = cgrd;
+                        this.lightingCtx.beginPath();
+                        this.lightingCtx.arc(cx, cy, crd, 0, Math.PI * 2);
+                        this.lightingCtx.fill();
+                    }
+                }
+            }
+            
+            this.lightingCtx.globalCompositeOperation = 'source-over';
+            
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.drawImage(this.lightingCanvas, 0, 0);
+            ctx.restore();
         }
     }
 }
