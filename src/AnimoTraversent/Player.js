@@ -8,7 +8,8 @@ export class Player {
         this.color = '#3498db';
 
         this.inventory = {
-            wood: 50
+            wood: 0,
+            stone: 0
         };
         this.selectedBlockId = 'wood';
 
@@ -99,8 +100,7 @@ export class Player {
         ctx.arc(this.x, this.y, this.width / 2, 0, Math.PI * 2);
         ctx.stroke();
 
-        // Direction indicator
-        ctx.strokeStyle = '#f1c40f'; // Ligne jaune visuelle
+        ctx.strokeStyle = '#f1c40f';
         ctx.lineWidth = 4;
         ctx.lineCap = 'round';
         ctx.beginPath();

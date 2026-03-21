@@ -35,5 +35,25 @@ export const BLOCKS = {
         color: '#d35400',
         solid: false,
         placeable: true
+    },
+    tree: {
+        id: 'tree',
+        name: 'Arbre',
+        color: '#2d5a27',
+        solid: true,
+        harvestable: true,
+        drops: 'wood',
+        dropAmount: 3,
+        floor: 'grass'
+    },
+    rock: {
+        id: 'rock',
+        name: 'Rocher',
+        color: '#95a5a6',
+        solid: true,
+        harvestable: true,
+        drops: 'stone',
+        dropAmount: 2,
+        floor: 'sand'
     }
 };

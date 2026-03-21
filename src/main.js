@@ -21,7 +21,7 @@ class IslandCrafter {
     onReset() {
         localStorage.removeItem('islandCrafter_playedIntro');
         localStorage.removeItem('islandCrafter_player');
-        this.player.inventory = { wood: 50 };
+        this.player.inventory = { wood: 0, stone: 0 };
         this.state = 'INIT';
     }
 
@@ -83,9 +83,15 @@ class IslandCrafter {
 
     updateHUD() {
         if (!this.hudOverlay) return;
-        const count = this.player.inventory[this.player.selectedBlockId] || 0;
-        const blockName = BLOCKS[this.player.selectedBlockId]?.name || 'Rien';
-        this.hudOverlay.innerHTML = `🎒 ${blockName}: <b style="color: #f1c40f;">${count}</b>`;
+        const woodCount = this.player.inventory['wood'] || 0;
+        const stoneCount = this.player.inventory['stone'] || 0;
+        this.hudOverlay.innerHTML = `
+            <div style="text-align: center; margin-bottom: 5px;">🎒 Inventaire</div>
+            <div style="font-size:1.1rem; display: flex; gap: 15px; justify-content: center;">
+                <span>Bois: <b style="color: #f1c40f;">${woodCount}</b></span>
+                <span>Pierre: <b style="color: #bdc3c7;">${stoneCount}</b></span>
+            </div>
+        `;
     }
 
     startCinematic(engine) {
@@ -107,7 +113,7 @@ class IslandCrafter {
         
         this.introOverlay.innerHTML = `
             <div style="background: rgba(0,0,0,0.85); color: #fff; padding: 40px; border-radius: 12px; pointer-events: auto; max-width: 500px; text-align: center; font-family: 'Segoe UI', sans-serif; box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(10px); opacity: 0; transition: opacity 2s ease-in-out;" id="cinematic-box">
-                <h1 style="color: #f1c40f; margin-bottom: 20px; font-size: 2rem;">Bienvenue sur Island Crafter</h1>
+                <h1 style="color: #f1c40f; margin-bottom: 20px; font-size: 2rem;">Bienvenue sur AnimoTraversent</h1>
                 <p style="font-size: 1.1rem; line-height: 1.5; color: #dfe6e9; margin-bottom: 30px;">
                     Vous venez d'échouer sur une île vierge générée de manière unique.<br><br>
                     Utilisez <b>Z Q S D</b> ou les <b>Flèches</b> pour vous déplacer. Attention à ne pas tomber à l'eau !<br><br>
@@ -170,6 +176,19 @@ class IslandCrafter {
         const activeBlockId = this.player.selectedBlockId;
         const currentCell = this.engine.grid.getCell(cellX, cellY);
         
+        // INTERACTION : Récolte (Bûcheronnage / Minage)
+        if (currentCell && currentCell.harvestable) {
+            const dropId = currentCell.drops;
+            const amount = currentCell.dropAmount || 1;
+            
+            this.player.inventory[dropId] = (this.player.inventory[dropId] || 0) + amount;
+            this.engine.grid.setCell(cellX, cellY, BLOCKS[currentCell.floor]);
+            
+            this.savePlayer();
+            this.updateHUD();
+            return;
+        }
+
         // Retirer un pont existant et rendre le rondin de bois
         if (currentCell && currentCell.id === activeBlockId) {
             // Analyse de l'environnement pour déduire la profondeur originale
