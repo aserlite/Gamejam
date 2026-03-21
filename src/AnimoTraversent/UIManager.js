@@ -9,7 +9,11 @@ export class UIManager {
     }
 
     initHUD() {
+        const oldDom = document.getElementById('animo-hud');
+        if (oldDom) oldDom.remove();
+
         this.hudOverlay = document.createElement('div');
+        this.hudOverlay.id = 'animo-hud';
         this.hudOverlay.style.position = 'absolute';
         this.hudOverlay.style.bottom = '20px';
         this.hudOverlay.style.left = '50%';
@@ -30,22 +34,69 @@ export class UIManager {
 
     updateHUD() {
         if (!this.hudOverlay) return;
-        const woodCount = this.app.player.inventory['wood'] || 0;
-        const stoneCount = this.app.player.inventory['stone'] || 0;
-        this.hudOverlay.innerHTML = `
-            <div style="text-align: center; margin-bottom: 5px;">🎒 Inventaire</div>
-            <div style="font-size:1.1rem; display: flex; gap: 15px; justify-content: center;">
-                <span>Bois: <b style="color: #f1c40f;">${woodCount}</b></span>
-                <span>Pierre: <b style="color: #bdc3c7;">${stoneCount}</b></span>
-            </div>
-        `;
+
+        const hotbar = this.app.player.hotbar || [];
+        const selectedSlot = this.app.player.selectedSlot || 0;
+
+        const rawWood = this.app.player.inventory['wood'] || 0;
+        const rawStone = this.app.player.inventory['stone'] || 0;
+
+        let html = `<div style="text-align: center; margin-bottom: 12px; font-size: 1rem; color: #dfe6e9; padding: 5px; border-radius: 8px;">
+            🌲 Bois : <span style="color: #f1c40f; font-weight: bold; font-size: 1.2rem;">${rawWood}</span> &nbsp;|&nbsp; 
+            🪨 Pierre : <span style="color: #bdc3c7; font-weight: bold; font-size: 1.2rem;">${rawStone}</span>
+        </div>`;
+
+        html += '<div style="font-size:1rem; display: flex; gap: 8px; justify-content: center; align-items: flex-end;">';
+        
+        hotbar.forEach((itemId, index) => {
+            const isSelected = (index === selectedSlot);
+            const blockName = window.BLOCKS[itemId] ? window.BLOCKS[itemId].name : itemId;
+            
+            let costLabel = '';
+            let canAfford = true;
+
+            if (itemId === 'wood' || itemId === 'wood_wall') {
+                costLabel = "Coût: 1 Bois";
+                canAfford = rawWood >= 1;
+            } else if (itemId === 'stone') {
+                costLabel = "Coût: 1 Pierre";
+                canAfford = rawStone >= 1;
+            } else if (itemId === 'empty_hand') {
+                costLabel = "Aucun";
+                canAfford = true;
+            } else if (itemId === 'house_door') {
+                const count = this.app.player.inventory['house_door'] || 0;
+                costLabel = `${count} dispo.`;
+                canAfford = count >= 1;
+            }
+
+            const bg = isSelected ? 'rgba(241, 196, 15, 0.25)' : 'rgba(0, 0, 0, 0.6)';
+            const border = isSelected ? '2px solid #f1c40f' : '2px solid rgba(255,255,255,0.1)';
+            const opacity = canAfford ? '1' : '0.4';
+            const titleColor = isSelected ? '#f1c40f' : '#ecf0f1';
+            
+            html += `
+                <div style="background: ${bg}; border: ${border}; opacity: ${opacity}; padding: 6px 12px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; min-width: 80px; transition: 0.2s;">
+                    <span style="font-size: 0.65rem; color: #7f8c8d; margin-bottom: 2px;">[Touche ${index + 1}]</span>
+                    <span style="font-size: 0.8rem; text-transform: uppercase; font-weight: bold; color: ${titleColor}; margin-bottom: 4px;">${blockName}</span>
+                    <span style="font-size: 0.7rem; color: #95a5a6; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px;">${costLabel}</span>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        this.hudOverlay.innerHTML = html;
     }
 
     showLobby(dataLoaded) {
         this.app.state = 'MENU';
         this.app.engine.camera.zoom = 0.5;
 
+        const oldDom = document.getElementById('animo-menu');
+        if (oldDom) oldDom.remove();
+
         this.menuOverlay = document.createElement('div');
+        this.menuOverlay.id = 'animo-menu';
         this.menuOverlay.style.position = 'absolute';
         this.menuOverlay.style.top = '0';
         this.menuOverlay.style.left = '0';
@@ -140,7 +191,11 @@ export class UIManager {
         this.app.engine.camera.zoom = 1;
         this.app.cinematicTime = 0;
 
+        const oldDom = document.getElementById('animo-cinematic');
+        if (oldDom) oldDom.remove();
+
         this.introOverlay = document.createElement('div');
+        this.introOverlay.id = 'animo-cinematic';
         this.introOverlay.style.position = 'absolute';
         this.introOverlay.style.top = '0';
         this.introOverlay.style.left = '0';

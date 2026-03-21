@@ -3,6 +3,7 @@ import { Player } from './AnimoTraversent/Player.js';
 import { BLOCKS } from './AnimoTraversent/BlockDictionary.js';
 import { NetworkManager } from './AnimoTraversent/NetworkManager.js';
 import { UIManager } from './AnimoTraversent/UIManager.js';
+import { generateHouseRegion } from './AnimoTraversent/HouseGenerator.js';
 
 window.BLOCKS = BLOCKS;
 
@@ -11,6 +12,12 @@ class IslandCrafter {
         this.player = new Player(0, 0); 
         this.state = 'MENU'; 
         this.cinematicTime = 0;
+        
+        this.harvestTimer = 0;
+        this.isHarvesting = false;
+        this.targetHarvestX = -1;
+        this.targetHarvestY = -1;
+
         this.engine = null;
         this.network = new NetworkManager();
         this.remotePlayers = {};
@@ -23,7 +30,8 @@ class IslandCrafter {
     onReset() {
         localStorage.removeItem('islandCrafter_playedIntro');
         localStorage.removeItem('islandCrafter_player');
-        this.player.inventory = { wood: 0, stone: 0 };
+        this.player.inventory = { wood: 0, stone: 0, wood_wall: 0, house_door: 1 };
+        this.player.hotbar = ['empty_hand', 'wood', 'stone', 'wood_wall', 'house_door'];
         this.state = 'INIT';
     }
 
@@ -44,6 +52,13 @@ class IslandCrafter {
                     this.player.inventory = pData.inventory;
                 }
             } catch(e) {}
+        }
+
+        if ((this.player.inventory['house_door'] || 0) <= 0) {
+            this.player.hotbar = this.player.hotbar.filter(id => id !== 'house_door');
+            if (this.player.selectedSlot >= this.player.hotbar.length) {
+                this.player.selectedSlot = Math.max(0, this.player.hotbar.length - 1);
+            }
         }
 
         this.ui.updateHUD();
@@ -117,6 +132,19 @@ class IslandCrafter {
             e.preventDefault();
             this.tryPlaceBlock();
         }
+
+        const keyMap = {
+            'Digit1': 0, 'Numpad1': 0,
+            'Digit2': 1, 'Numpad2': 1,
+            'Digit3': 2, 'Numpad3': 2,
+            'Digit4': 3, 'Numpad4': 3,
+            'Digit5': 4, 'Numpad5': 4
+        };
+
+        if (keyMap[e.code] !== undefined) {
+            this.player.selectedSlot = keyMap[e.code];
+            this.ui.updateHUD();
+        }
     }
 
     tryPlaceBlock() {
@@ -128,40 +156,58 @@ class IslandCrafter {
 
         const activeBlockId = this.player.selectedBlockId;
         const currentCell = this.engine.grid.getCell(cellX, cellY);
+
+        if (currentCell && currentCell.interactable) {
+            if (currentCell.teleport === 'inside') {
+                this.lastOverworldX = this.player.x;
+                this.lastOverworldY = this.player.y;
+                
+                const hx = 10000;
+                const hy = 10000;
+                generateHouseRegion(this.engine, hx, hy);
+                
+                this.player.x = hx * this.engine.cellSize;
+                this.player.y = (hy + 4) * this.engine.cellSize;
+                
+                this.engine.camera.x = this.engine.canvas.width / 2 - this.player.x * this.engine.camera.zoom;
+                this.engine.camera.y = this.engine.canvas.height / 2 - this.player.y * this.engine.camera.zoom;
+                return;
+            } else if (currentCell.teleport === 'outside') {
+                this.player.x = this.lastOverworldX || 0;
+                this.player.y = this.lastOverworldY || 0;
+                this.engine.camera.x = this.engine.canvas.width / 2 - this.player.x * this.engine.camera.zoom;
+                this.engine.camera.y = this.engine.canvas.height / 2 - this.player.y * this.engine.camera.zoom;
+                return;
+            }
+        }
         
         if (currentCell && currentCell.harvestable) {
-            const dropId = currentCell.drops;
-            const amount = currentCell.dropAmount || 1;
-            
-            this.player.inventory[dropId] = (this.player.inventory[dropId] || 0) + amount;
-            this.engine.grid.setCell(cellX, cellY, BLOCKS[currentCell.floor]);
-            
-            this.network.broadcast({
-                type: 'action',
-                payload: { action: 'placeBlock', x: cellX, y: cellY, blockId: currentCell.floor }
-            }, []);
-
-            this.savePlayer();
-            this.ui.updateHUD();
             return;
         }
 
         if (currentCell && currentCell.id === activeBlockId) {
-            let deepCount = 0;
-            const neighbors = [
-                this.engine.grid.getCell(cellX - 1, cellY),
-                this.engine.grid.getCell(cellX + 1, cellY),
-                this.engine.grid.getCell(cellX, cellY - 1),
-                this.engine.grid.getCell(cellX, cellY + 1)
-            ];
+            let restoredBlock;
             
-            for (let n of neighbors) {
-                if (n && (n.id === 'deep_water' || n.id === 'abyss')) {
-                    deepCount++;
+            if (activeBlockId === 'wood') {
+                let deepCount = 0;
+                const neighbors = [
+                    this.engine.grid.getCell(cellX - 1, cellY),
+                    this.engine.grid.getCell(cellX + 1, cellY),
+                    this.engine.grid.getCell(cellX, cellY - 1),
+                    this.engine.grid.getCell(cellX, cellY + 1)
+                ];
+                
+                for (let n of neighbors) {
+                    if (n && (n.id === 'deep_water' || n.id === 'abyss')) {
+                        deepCount++;
+                    }
                 }
+                restoredBlock = deepCount >= 2 ? BLOCKS.deep_water : BLOCKS.water;
+            } else if (['wood_wall', 'plank_floor', 'house_door'].includes(activeBlockId)) {
+                restoredBlock = (cellX > 1000) ? BLOCKS.plank_floor : BLOCKS.grass;
+            } else {
+                return;
             }
-
-            const restoredBlock = deepCount >= 2 ? BLOCKS.deep_water : BLOCKS.water;
 
             this.engine.grid.setCell(cellX, cellY, restoredBlock);
 
@@ -176,7 +222,10 @@ class IslandCrafter {
             return;
         }
 
-        const hasBlock = this.player.inventory[activeBlockId] > 0;
+        let costItem = activeBlockId;
+        if (activeBlockId === 'wood_wall') costItem = 'wood';
+
+        const hasBlock = this.player.inventory[costItem] > 0;
         
         if (hasBlock && (!currentCell || currentCell.id !== activeBlockId)) {
             const blockObj = BLOCKS[activeBlockId];
@@ -188,14 +237,55 @@ class IslandCrafter {
                     return;
                 }
 
-                this.engine.grid.setCell(cellX, cellY, blockObj);
+                if (activeBlockId === 'wood_wall') {
+                    const validFloors = ['grass', 'sand', 'plank_floor'];
+                    if (!currentCell || !validFloors.includes(currentCell.id)) {
+                        return;
+                    }
+                }
+
+                if (activeBlockId === 'house_door') {
+                    let canBuild = true;
+                    const offsets = [
+                        { dx: 0, dy: -3 },
+                        { dx: -1, dy: -2 }, { dx: 0, dy: -2 }, { dx: 1, dy: -2 },
+                        { dx: -1, dy: -1 }, { dx: 0, dy: -1 }, { dx: 1, dy: -1 },
+                        { dx: -1, dy: 0 }, { dx: 1, dy: 0 }
+                    ];
+                    for (let off of offsets) {
+                        const cell = this.engine.grid.getCell(cellX + off.dx, cellY + off.dy);
+                        if (cell && (cell.solid || cell.id === 'water' || cell.id === 'deep_water' || cell.id === 'abyss')) {
+                            canBuild = false; break;
+                        }
+                    }
+                    if (!canBuild) return;
+
+                    this.engine.grid.setCell(cellX, cellY, blockObj);
+                    for (let off of offsets) {
+                        this.engine.grid.setCell(cellX + off.dx, cellY + off.dy, BLOCKS.house_structure);
+                        this.network.broadcast({
+                            type: 'action',
+                            payload: { action: 'placeBlock', x: cellX + off.dx, y: cellY + off.dy, blockId: 'house_structure' }
+                        }, []);
+                    }
+                } else {
+                    this.engine.grid.setCell(cellX, cellY, blockObj);
+                }
 
                 this.network.broadcast({
                     type: 'action',
                     payload: { action: 'placeBlock', x: cellX, y: cellY, blockId: blockObj.id }
                 }, []);
 
-                this.player.inventory[activeBlockId]--;
+                this.player.inventory[costItem]--;
+
+                if (activeBlockId === 'house_door' && this.player.inventory['house_door'] <= 0) {
+                    this.player.hotbar = this.player.hotbar.filter(id => id !== 'house_door');
+                    if (this.player.selectedSlot >= this.player.hotbar.length) {
+                        this.player.selectedSlot = this.player.hotbar.length - 1;
+                    }
+                }
+
                 this.savePlayer();
                 this.ui.updateHUD();
             }
@@ -228,6 +318,51 @@ class IslandCrafter {
             
             this.player.update(dt, engine.inputManager, engine.grid, engine.cellSize);
             
+            const isSpaceDown = engine.inputManager.isKeyDown('Space') || engine.inputManager.isKeyDown('Spacebar');
+            const targetX = this.player.x + this.player.facingX * engine.cellSize;
+            const targetY = this.player.y + this.player.facingY * engine.cellSize;
+            const cellX = Math.floor(targetX / engine.cellSize);
+            const cellY = Math.floor(targetY / engine.cellSize);
+            const currentCell = engine.grid.getCell(cellX, cellY);
+
+            let executingHarvest = false;
+
+            if (isSpaceDown && currentCell && currentCell.harvestable && this.player.selectedBlockId === 'empty_hand') {
+                if (this.targetHarvestX !== cellX || this.targetHarvestY !== cellY) {
+                    this.targetHarvestX = cellX;
+                    this.targetHarvestY = cellY;
+                    this.harvestTimer = 0;
+                }
+                this.isHarvesting = true;
+                this.harvestTimer += dt;
+                
+                if (this.harvestTimer >= 0.6) {
+                    executingHarvest = true;
+                    this.isHarvesting = false;
+                    this.harvestTimer = 0;
+                }
+            } else {
+                this.isHarvesting = false;
+                this.harvestTimer = 0;
+                this.targetHarvestX = -1;
+                this.targetHarvestY = -1;
+            }
+
+            if (executingHarvest) {
+                const dropId = currentCell.drops;
+                const amount = currentCell.dropAmount || 1;
+                this.player.inventory[dropId] = (this.player.inventory[dropId] || 0) + amount;
+                engine.grid.setCell(cellX, cellY, BLOCKS[currentCell.floor]);
+                
+                this.network.broadcast({
+                    type: 'action',
+                    payload: { action: 'placeBlock', x: cellX, y: cellY, blockId: currentCell.floor }
+                }, []);
+                
+                this.savePlayer();
+                this.ui.updateHUD();
+            }
+
             this.networkSyncTimer = (this.networkSyncTimer || 0) + dt;
             if (this.networkSyncTimer > 0.05) {
                 if (this.player.x !== this.lastSentX || this.player.y !== this.lastSentY || 
@@ -263,9 +398,57 @@ class IslandCrafter {
     }
 
     onRender(ctx, camera) {
+        const view = this.engine.getViewport();
+        for (let x = view.startCol; x <= view.endCol; x++) {
+            for (let y = view.startRow; y <= view.endRow; y++) {
+                const cell = this.engine.grid.getCell(x, y);
+                if (cell && cell.id === 'house_door') {
+                    const cx = x * this.engine.cellSize;
+                    const cy = y * this.engine.cellSize;
+                    const cs = this.engine.cellSize;
+
+                    ctx.fillStyle = '#ecf0f1';
+                    ctx.fillRect(cx - cs, cy - cs, cs * 3, cs * 2);
+                    
+                    ctx.fillStyle = cell.color;
+                    ctx.fillRect(cx, cy, cs, cs);
+                    
+                    ctx.fillStyle = '#c0392b';
+                    ctx.beginPath();
+                    ctx.moveTo(cx - cs * 1.5, cy - cs);
+                    ctx.lineTo(cx + cs * 2.5, cy - cs);
+                    ctx.lineTo(cx + cs * 0.5, cy - cs * 3);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#7f8c8d';
+                    ctx.fillRect(cx + cs * 0.1, cy + cs, cs * 0.8, cs * 0.3);
+                }
+            }
+        }
+
         this.player.draw(ctx);
         for (const peerId in this.remotePlayers) {
             this.remotePlayers[peerId].draw(ctx);
+        }
+
+        if (this.state === 'PLAYING' && this.isHarvesting && this.targetHarvestX !== -1) {
+            const px = this.targetHarvestX * this.engine.cellSize;
+            const py = this.targetHarvestY * this.engine.cellSize;
+
+            const shakeX = (Math.random() - 0.5) * 4;
+            const shakeY = (Math.random() - 0.5) * 4;
+
+            const cell = this.engine.grid.getCell(this.targetHarvestX, this.targetHarvestY);
+            if (cell) {
+                ctx.fillStyle = cell.color;
+                ctx.fillRect(px + shakeX, py + shakeY, this.engine.cellSize, this.engine.cellSize);
+            }
+
+            const progress = Math.min(1, this.harvestTimer / 0.6);
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.fillRect(px, py - 10, this.engine.cellSize, 8);
+            ctx.fillStyle = '#2ecc71';
+            ctx.fillRect(px + 1, py - 9, (this.engine.cellSize - 2) * progress, 6);
         }
     }
 }

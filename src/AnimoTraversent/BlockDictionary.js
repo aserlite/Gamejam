@@ -1,4 +1,11 @@
 export const BLOCKS = {
+    empty_hand: {
+        id: 'empty_hand',
+        name: 'Main vide',
+        color: 'transparent',
+        solid: false,
+        placeable: false
+    },
     abyss: {
         id: 'abyss',
         name: 'Océan',
@@ -43,7 +50,7 @@ export const BLOCKS = {
         solid: true,
         harvestable: true,
         drops: 'wood',
-        dropAmount: 3,
+        dropAmount: 2,
         floor: 'grass'
     },
     rock: {
@@ -55,5 +62,49 @@ export const BLOCKS = {
         drops: 'stone',
         dropAmount: 2,
         floor: 'sand'
+    },
+    wood_wall: {
+        id: 'wood_wall',
+        name: 'Mur en bois',
+        color: '#e67e22',
+        solid: true,
+        placeable: true
+    },
+    house_wall: {
+        id: 'house_wall',
+        name: 'Mur Foyer',
+        color: '#2c3e50',
+        solid: true
+    },
+    plank_floor: {
+        id: 'plank_floor',
+        name: 'Plancher',
+        color: '#8c7050',
+        solid: false,
+        placeable: true
+    },
+    house_door: {
+        id: 'house_door',
+        name: 'Maison',
+        color: '#d35400',
+        solid: true,
+        interactable: true,
+        teleport: 'inside',
+        placeable: true
+    },
+    house_structure: {
+        id: 'house_structure',
+        name: 'Toit',
+        color: '#78e08f',
+        solid: true,
+        placeable: false
+    },
+    house_exit: {
+        id: 'house_exit',
+        name: 'Sortie',
+        color: '#c0392b',
+        solid: false,
+        interactable: true,
+        teleport: 'outside'
     }
 };

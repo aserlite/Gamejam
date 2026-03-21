@@ -9,12 +9,19 @@ export class Player {
 
         this.inventory = {
             wood: 0,
-            stone: 0
+            stone: 0,
+            wood_wall: 0,
+            house_door: 1
         };
-        this.selectedBlockId = 'wood';
+        this.hotbar = ['empty_hand', 'wood', 'stone', 'wood_wall', 'house_door'];
+        this.selectedSlot = 0;
 
         this.facingX = 0;
         this.facingY = 1;
+    }
+
+    get selectedBlockId() {
+        return this.hotbar[this.selectedSlot];
     }
 
     update(dt, inputManager, grid, cellSize) {
