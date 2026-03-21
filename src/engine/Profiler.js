@@ -60,7 +60,7 @@ export class Profiler {
         const boxX = ctx.canvas.width - boxWidth - 10;
         const boxY = 10;
 
-        ctx.fillStyle = this.fps > 0 && this.fps < 30 ? 'rgba(100, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.7)';
+        ctx.fillStyle = this.fps > 0 && this.fps < 15 ? 'rgba(100, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.7)';
         ctx.strokeStyle = '#555';
         ctx.lineWidth = 1;
         ctx.beginPath();
