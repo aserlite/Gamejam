@@ -98,64 +98,21 @@ class IslandCrafter {
         this.network.onPlayerJoined = (peerId) => {
             if (this.network.isHost) {
                 const mapPayload = this.engine.grid.serialize();
-                this.network.broadcast({ type: 'mapSync', payload: mapPayload }, []);
+                this.network.broadcast({ type: 'mapSync', payload: { grid: mapPayload, dayTime: this.dayTime } }, []);
             }
         };
 
         this.network.onMapReceived = (mapPayload) => {
             if (!this.network.isHost) {
                 this.engine.grid.chunks.clear(); 
-                this.engine.grid.deserialize(mapPayload);
+                this.engine.grid.deserialize(mapPayload.grid !== undefined ? mapPayload.grid : mapPayload);
+                if (mapPayload.dayTime !== undefined) this.dayTime = mapPayload.dayTime;
                 this.startGameProcess(true);
             }
         };
 
-        this.network.onMessageReceived = (peerId, message) => {
-            switch (message.type) {
-                case 'requestWorldData':
-                    if (this.network.isHost) {
-                        const serializedGrid = this.engine.grid.serialize();
-                        this.network.broadcast({
-                            type: 'worldData',
-                            payload: { grid: serializedGrid, dayTime: this.dayTime }
-                        }, [peerId]);
-                    }
-                    break;
-                case 'worldData':
-                    if (!this.network.isHost) {
-                        this.engine.grid.deserialize(message.payload.grid);
-                        if (message.payload.dayTime !== undefined) this.dayTime = message.payload.dayTime;
-                        this.ui.showLobby(true);
-                    }
-                    break;
-                case 'playerSync':
-                    if (peerId === this.network.peerId) return;
-                    let remotePlayer = this.remotePlayers[peerId];
-                    if (!remotePlayer) {
-                        remotePlayer = new Player(message.payload.x, message.payload.y);
-                        this.remotePlayers[peerId] = remotePlayer;
-                        remotePlayer.color = '#e74c3c';
-                    }
-                    remotePlayer.x = message.payload.x;
-                    remotePlayer.y = message.payload.y;
-                    remotePlayer.facingX = message.payload.facingX;
-                    remotePlayer.facingY = message.payload.facingY;
-                    if (!this.network.isHost && message.payload.dayTime !== undefined) {
-                        this.dayTime = message.payload.dayTime;
-                    }
-                    break;
-                case 'action':
-                    const { action, x, y, blockId } = message.payload;
-                    if (action === 'placeBlock' && BLOCKS[blockId]) {
-                        this.engine.grid.setCell(x, y, BLOCKS[blockId]);
-                    }
-                    break;
-                default:
-                    console.log(`Unknown message type: ${message.type}`);
-            }
-        };
-
         this.network.onPlayerMoved = (peerId, payload) => {
+            if (peerId === this.network.id) return;
             if (!this.remotePlayers[peerId]) {
                 this.remotePlayers[peerId] = new Player(payload.x, payload.y);
                 this.remotePlayers[peerId].color = '#e74c3c';
@@ -164,6 +121,9 @@ class IslandCrafter {
             this.remotePlayers[peerId].y = payload.y;
             this.remotePlayers[peerId].facingX = payload.facingX;
             this.remotePlayers[peerId].facingY = payload.facingY;
+            if (!this.network.isHost && payload.dayTime !== undefined) {
+                this.dayTime = payload.dayTime;
+            }
         };
 
         this.network.onActionReceived = (peerId, payload) => {
@@ -461,10 +421,8 @@ class IslandCrafter {
                 this.savePlayer();
                 this.ui.updateHUD();
             }
-            if (this.network.isHost) {
-                this.dayTime += dt / this.dayDuration;
-                if (this.dayTime >= 1) this.dayTime -= 1;
-            }
+            this.dayTime += dt / this.dayDuration;
+            if (this.dayTime >= 1) this.dayTime -= 1;
             
             const hours = Math.floor((this.dayTime * 24 + 12) % 24);
             const minutes = Math.floor((((this.dayTime * 24 + 12) % 24) % 1) * 60);
@@ -476,7 +434,7 @@ class IslandCrafter {
                     this.player.facingX !== this.lastSentFacingX || this.player.facingY !== this.lastSentFacingY) {
                     
                     this.network.broadcast({
-                        type: 'playerSync',
+                        type: 'playerMoved',
                         payload: {
                             x: this.player.x,
                             y: this.player.y,
