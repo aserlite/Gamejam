@@ -1,63 +1,40 @@
-# 🏎️ MoteurVroum
+# AnimoTraversent 🏝️
 
-**MoteurVroum** est un moteur de rendu et de simulation 2D modulaire, ultraléger et performant, basé sur une grille infinie. Construit de zéro en Vanilla JavaScript et HTML5 Canvas, il est conçu pour prototyper rapidement des idées génératives (automates cellulaires, génération procédurale, simulations de particules, etc.) sans s'encombrer de bibliothèques lourdes.
+**AnimoTraversent** est un jeu navigateur 2D de type *Animal Crossing-like* axé sur l'exploration et le craft, codé en **Vanilla JavaScript**. Il s'appuie sur le moteur fait maison "Moteur Vroum", basé sur une grille spatiale optimisée par pré-rendu de chunks virtuels (`OffscreenCanvas`).
 
----
+![Game Preview](./public/icon.webp)
 
-## ✨ Fonctionnalités Clés
-
-*   ♾️ **Grille Infinie & Chunking :** Le monde est découpé en "Chunks" alloués dynamiquement (Sparse Matrix) pour une consommation mémoire optimisée. Seul ce que vous explorez existe !
-*   🚀 **Culling Haute Performance :** Le moteur de rendu ne dessine strictement que les cellules visibles à l'écran. Objectif 60 FPS constant.
-*   🎥 **Caméra Mathématique Intégrée :** Déplacement fluide (Pan) et Zoom infini centré sur le curseur, avec conversion transparente entre l'espace "Écran" et l'espace "Monde".
-*   🧩 **Architecture Modulaire (Inversion de Contrôle) :** Le cœur du moteur (`/engine`) est totalement indépendant de la logique du jeu (`/projects`). Chargez dynamiquement le projet que vous souhaitez via le menu d'accueil.
-*   🔗 **Partage de Création par URL :** Sérialisation instantanée de votre grille en Base64. Partagez votre monde avec un simple lien généré automatiquement !
-*   🎨 **Outils Intégrés :** Palette de couleurs, mode édition, gomme, et console de Debug superposée (avec opacité réglable).
-
----
-
-## 🎮 Contrôles & Raccourcis
-
-| Action | Raccourci |
-| :--- | :--- |
-| **Déplacer la caméra (Pan)** | `Clic Gauche` (Maintenir & Glisser) |
-| **Zoomer / Dézoomer** | `Molette de la souris` |
-| **Dessiner / Placer une cellule** | `Shift` + `Clic Gauche` |
-| **Ouvrir/Fermer la Palette** | Touche `C` |
-| **Afficher/Estomper le Debug** | Touche `D` |
-| **Partager le projet (Copier URL)**| Touche `S` |
-| **Quitter le projet en cours** | Touche `Échap` (Escape) |
-
-
-## 🛠️ Créer son propre projet (Règle)
-
-La force de ce moteur réside dans sa simplicité de modding. Pour créer une nouvelle simulation, il vous suffit de créer un fichier dans le dossier `src/projects/`.
-
-1. Dupliquez le fichier `src/rules_templates/BaseRule.js`.
-2. Renommez-le et placez-le dans `src/projects/MonSuperProjet.js`.
-3. Le projet sera **automatiquement** détecté par le menu d'accueil !
-
-### Cycle de vie d'un projet :
-```javascript
-export class MonSuperProjet {
-    // 1. Appelé une seule fois au chargement
-    onInit(engine) {
-        engine.debugDisplay.setCustomData('Statut', 'Prêt !');
-    }
-
-    // 2. Appelé à chaque frame (Calculs physiques, automates, inputs)
-    onTick(dt, engine) {
-        // Manipulez la grille ici : engine.grid.setCell(x, y, data)
-    }
-
-    // 3. (Optionnel) Appelé après le rendu de la grille pour dessiner des UI/FX par dessus
-    onRender(ctx, camera) { }
-}
+## 🎮 Jouer
+Pour démarrer le mode développement local avec Vite :
+```bash
+npm install
+npm run dev
 ```
 
----
+## ✨ Fonctionnalités Principales
 
-## 🏗️ Stack Technique
-*   **Langage :** Vanilla JavaScript (ES6+ Modules)
-*   **Rendu :** API native `<canvas>` (CanvasRenderingContext2D)
-*   **Build Tool :** Vite
-*   **Zéro dépendance externe** pour la logique et le rendu (pas de Three.js, pas de Pixi.js). Fait maison avec amour ! 💚
+### 🗺️ Génération Procédurale (Bruit Fractal)
+* **Masque Continental** : L'algorithme mathématique garantit l'apparition d'un point de spawn sécurisé (une massive île centrale) avant de s'étendre en îles adjacentes et en lacs.
+* **Archipels Naturels** : L'injection de Bruit de Perlin (3 couches simultanées `SimplexNoise`) crée des rivages accidentés, des îlots et des lacs intérieurs organiques.
+* **Biomes Dynamiques** : Abysse, Eau Profonde, Eau, Sable, et Herbe fusionnent la carte selon la topologie.
+
+### 🎒 Survie & Construction Directionnelle
+* **Physique & Collision** : Le joueur est équipé d'une hitbox glissante et réagit physiquement aux blocs taggés comme solides (L'eau de mer agit comme un mur naturel).
+* **Construction Clavier** : Fini le God Mode à la souris. Le joueur doit faire face à une tuile vide (orientée Haut/Bas/Gauche/Droite) et utiliser la barre **Espace** de son clavier pour jeter un de ses 50 ponts de bois !
+* **Système Intelligent** : Vous pouvez détruire vos ponts existants et récupérer le bois si l'inventaire vient à manquer. La profondeur originale de l'eau écrasée sera parfaitement restaurée.
+
+### 💾 Sauvegarde Ultra-Légère 
+* **Compression IDs** : Une carte procédurale géante contient facilement plus de 22 000 blocs de grilles. Le système de sauvegarde a été retravaillé pour compresser les tuiles en de minuscules dictionnaires `{ i: 'grass' }`, prévenant les surcharges de `localStorage` (`QuotaExceededError`).
+* **Persistance Totale** : Si vous fermez et revenez au jeu le lendemain, votre configuration d'île exacte, et le contenu de votre sac à dos (Bois) seront restaurés au grain près.
+
+## ⌨️ Raccourcis & Contrôles
+
+* **Z Q S D / Flèches** : Se déplacer et s'orienter.
+* **Espace** : Placer un Pont sur l'eau (ou le détruire / ramasser si la tuile contient déjà un pont).
+* **H** : Afficher/Masquer le panneau UI de Debugging.
+* **Backspace / Supprimer** : Réinitialisation Dure. *Attention, cela détruira de manière permanente l'île actuelle de votre cache de navigateur et relancera un nouveau monde aléatoire !*
+
+---
+*Projet réalisé lors de la Game Jam 2026 de 803Z.*
+
+![803Z](./public/803z.png)

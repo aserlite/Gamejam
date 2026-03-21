@@ -54,9 +54,6 @@ export class Core {
         if (e.key === 'Backspace' || e.key === 'Delete') {
             this.resetProject();
         }
-        if (e.key === 'n' || e.key === 'N') {
-            this.timeControl.step();
-        }
     }
 
     resize() {
@@ -95,7 +92,6 @@ export class Core {
 
         this.debugDisplay.setCustomData('Partage', 'Touche S');
         this.debugDisplay.setCustomData('Reset', 'Touche Backspace/Delete');
-        this.debugDisplay.setCustomData('Step', 'Touche N');
         
         this.resize();
     }
