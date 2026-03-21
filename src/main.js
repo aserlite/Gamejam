@@ -31,7 +31,7 @@ class IslandCrafter {
         localStorage.removeItem('islandCrafter_playedIntro');
         localStorage.removeItem('islandCrafter_player');
         this.player.inventory = { wood: 0, stone: 0, wood_wall: 0, house_door: 1 };
-        this.player.hotbar = ['empty_hand', 'wood', 'stone', 'wood_wall', 'house_door'];
+        this.player.hotbar = ['empty_hand', 'wood', 'wood_wall', 'campfire', 'house_door'];
         this.state = 'INIT';
     }
 
@@ -185,6 +185,19 @@ class IslandCrafter {
             return;
         }
 
+        let costWood = 0;
+        let costStone = 0;
+        let isSpecial = false;
+
+        if (activeBlockId === 'wood' || activeBlockId === 'wood_wall') {
+            costWood = 1;
+        } else if (activeBlockId === 'campfire') {
+            costWood = 1;
+            costStone = 1;
+        } else if (activeBlockId === 'house_door') {
+            isSpecial = true;
+        }
+
         if (currentCell && currentCell.id === activeBlockId) {
             let restoredBlock;
             
@@ -203,7 +216,7 @@ class IslandCrafter {
                     }
                 }
                 restoredBlock = deepCount >= 2 ? BLOCKS.deep_water : BLOCKS.water;
-            } else if (['wood_wall', 'plank_floor', 'house_door'].includes(activeBlockId)) {
+            } else if (['wood_wall', 'plank_floor', 'house_door', 'campfire'].includes(activeBlockId)) {
                 restoredBlock = (cellX > 1000) ? BLOCKS.plank_floor : BLOCKS.grass;
             } else {
                 return;
@@ -216,16 +229,25 @@ class IslandCrafter {
                 payload: { action: 'placeBlock', x: cellX, y: cellY, blockId: restoredBlock.id }
             }, []);
 
-            this.player.inventory[activeBlockId]++;
+            if (isSpecial) {
+                this.player.inventory[activeBlockId] = (this.player.inventory[activeBlockId] || 0) + 1;
+            } else {
+                if (costWood > 0) this.player.inventory['wood'] = (this.player.inventory['wood'] || 0) + 1;
+                if (costStone > 0) this.player.inventory['stone'] = (this.player.inventory['stone'] || 0) + 1;
+            }
+
             this.savePlayer();
             this.ui.updateHUD();
             return;
         }
 
-        let costItem = activeBlockId;
-        if (activeBlockId === 'wood_wall') costItem = 'wood';
-
-        const hasBlock = this.player.inventory[costItem] > 0;
+        let hasBlock = true;
+        if (isSpecial) {
+            hasBlock = (this.player.inventory[activeBlockId] > 0);
+        } else {
+            if (costWood > 0 && (this.player.inventory['wood'] || 0) < costWood) hasBlock = false;
+            if (costStone > 0 && (this.player.inventory['stone'] || 0) < costStone) hasBlock = false;
+        }
         
         if (hasBlock && (!currentCell || currentCell.id !== activeBlockId)) {
             const blockObj = BLOCKS[activeBlockId];
@@ -237,7 +259,7 @@ class IslandCrafter {
                     return;
                 }
 
-                if (activeBlockId === 'wood_wall') {
+                if (activeBlockId === 'wood_wall' || activeBlockId === 'campfire') {
                     const validFloors = ['grass', 'sand', 'plank_floor'];
                     if (!currentCell || !validFloors.includes(currentCell.id)) {
                         return;
@@ -277,13 +299,17 @@ class IslandCrafter {
                     payload: { action: 'placeBlock', x: cellX, y: cellY, blockId: blockObj.id }
                 }, []);
 
-                this.player.inventory[costItem]--;
-
-                if (activeBlockId === 'house_door' && this.player.inventory['house_door'] <= 0) {
-                    this.player.hotbar = this.player.hotbar.filter(id => id !== 'house_door');
-                    if (this.player.selectedSlot >= this.player.hotbar.length) {
-                        this.player.selectedSlot = this.player.hotbar.length - 1;
+                if (isSpecial) {
+                    this.player.inventory[activeBlockId]--;
+                    if (activeBlockId === 'house_door' && this.player.inventory['house_door'] <= 0) {
+                        this.player.hotbar = this.player.hotbar.filter(id => id !== 'house_door');
+                        if (this.player.selectedSlot >= this.player.hotbar.length) {
+                            this.player.selectedSlot = Math.max(0, this.player.hotbar.length - 1);
+                        }
                     }
+                } else {
+                    if (costWood > 0) this.player.inventory['wood']--;
+                    if (costStone > 0) this.player.inventory['stone']--;
                 }
 
                 this.savePlayer();

@@ -58,9 +58,9 @@ export class UIManager {
             if (itemId === 'wood' || itemId === 'wood_wall') {
                 costLabel = "Coût: 1 Bois";
                 canAfford = rawWood >= 1;
-            } else if (itemId === 'stone') {
-                costLabel = "Coût: 1 Pierre";
-                canAfford = rawStone >= 1;
+            } else if (itemId === 'campfire') {
+                costLabel = "1 B. + 1 P.";
+                canAfford = (rawWood >= 1 && rawStone >= 1);
             } else if (itemId === 'empty_hand') {
                 costLabel = "Aucun";
                 canAfford = true;

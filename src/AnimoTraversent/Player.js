@@ -13,7 +13,7 @@ export class Player {
             wood_wall: 0,
             house_door: 1
         };
-        this.hotbar = ['empty_hand', 'wood', 'stone', 'wood_wall', 'house_door'];
+        this.hotbar = ['empty_hand', 'wood', 'wood_wall', 'campfire', 'house_door'];
         this.selectedSlot = 0;
 
         this.facingX = 0;

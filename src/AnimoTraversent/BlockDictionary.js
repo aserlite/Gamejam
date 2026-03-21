@@ -6,6 +6,13 @@ export const BLOCKS = {
         solid: false,
         placeable: false
     },
+    campfire: {
+        id: 'campfire',
+        name: 'Feu',
+        color: '#dba87cff',
+        solid: true,
+        placeable: true
+    },
     abyss: {
         id: 'abyss',
         name: 'Océan',
