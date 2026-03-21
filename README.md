@@ -37,4 +37,4 @@ npm run dev
 ---
 *Projet réalisé lors de la Game Jam 2026 de 803Z.*
 
-![803Z](./public/803z.png)
+![803Z](./public/803Z.png)
