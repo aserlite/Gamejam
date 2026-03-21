@@ -33,7 +33,6 @@ export class Core {
 
         this.resize = this.resize.bind(this);
         this.loop = this.loop.bind(this);
-        this.shareProject = this.shareProject.bind(this);
         this.resetProject = this.resetProject.bind(this);
         this.handleKeyDown = this.handleKeyDown.bind(this);
 
@@ -47,9 +46,6 @@ export class Core {
         if (e.key === 'h' || e.key === 'H') {
             this.uiVisible = !this.uiVisible;
             this.debugDisplay.enabled = this.uiVisible;
-        }
-        if (e.key === 's' || e.key === 'S') {
-            this.shareProject();
         }
         if (e.key === 'Backspace' || e.key === 'Delete') {
             this.resetProject();
@@ -90,7 +86,6 @@ export class Core {
             this.project.onInit(this, dataLoaded);
         }
 
-        this.debugDisplay.setCustomData('Partage', 'Touche S');
         this.debugDisplay.setCustomData('Reset', 'Touche Backspace/Delete');
         
         this.resize();
@@ -125,27 +120,6 @@ export class Core {
         
         this.debugDisplay.setCustomData('Reset OK!', '✔');
         setTimeout(() => this.debugDisplay.removeCustomData('Reset OK!'), 2000);
-    }
-
-    shareProject() {
-        if (!this.projectName) return;
-
-        const gridData = this.grid.serialize();
-        const encodedData = btoa(unescape(encodeURIComponent(gridData)));
-        
-        const url = new URL(window.location.href);
-        url.searchParams.set('p', this.projectName);
-        url.searchParams.set('d', encodedData);
-
-        navigator.clipboard.writeText(url.toString()).then(() => {
-            this.debugDisplay.setCustomData('Lien copié!', '✔');
-            setTimeout(() => {
-                this.debugDisplay.removeCustomData('Lien copié!');
-            }, 3000);
-        }).catch(err => {
-            console.error('Erreur lors de la copie du lien:', err);
-            this.debugDisplay.setCustomData('Erreur de copie', '❌');
-        });
     }
 
     quitToMenu() {
