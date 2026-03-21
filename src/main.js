@@ -1,18 +1,20 @@
 import { Core } from './engine/Core.js';
 import { Player } from './AnimoTraversent/Player.js';
-import { generateIsland } from './AnimoTraversent/MapGenerator.js';
 import { BLOCKS } from './AnimoTraversent/BlockDictionary.js';
+import { NetworkManager } from './AnimoTraversent/NetworkManager.js';
+import { UIManager } from './AnimoTraversent/UIManager.js';
 
 window.BLOCKS = BLOCKS;
 
 class IslandCrafter {
     constructor() {
         this.player = new Player(0, 0); 
-        this.state = 'INIT'; 
+        this.state = 'MENU'; 
         this.cinematicTime = 0;
-        this.introOverlay = null;
-        this.hudOverlay = null;
         this.engine = null;
+        this.network = new NetworkManager();
+        this.remotePlayers = {};
+        this.ui = new UIManager(this);
 
         this.handleKeyDown = this.handleKeyDown.bind(this);
         window.addEventListener('keydown', this.handleKeyDown);
@@ -30,11 +32,10 @@ class IslandCrafter {
         engine.camera.zoom = 2; 
         engine.timeControl.isPaused = false; 
 
-        this.initHUD();
+        this.ui.initHUD();
 
         const hasPlayedIntro = localStorage.getItem('islandCrafter_playedIntro') === 'true';
 
-        // Load Player state
         const savedPlayer = localStorage.getItem('islandCrafter_player');
         if (savedPlayer) {
             try {
@@ -45,123 +46,75 @@ class IslandCrafter {
             } catch(e) {}
         }
 
-        // Force l'actualisation visuelle après chargement des données locales
-        this.updateHUD();
+        this.ui.updateHUD();
+        this.ui.showLobby(dataLoaded);
+        this.setupCoreNetworking();
+    }
 
-        if (dataLoaded && hasPlayedIntro) {
+    setupCoreNetworking() {
+        this.network.onPlayerJoined = (peerId) => {
+            if (this.network.isHost) {
+                const mapPayload = this.engine.grid.serialize();
+                this.network.broadcast({ type: 'mapSync', payload: mapPayload }, []);
+            }
+        };
+
+        this.network.onMapReceived = (mapPayload) => {
+            if (!this.network.isHost) {
+                this.engine.grid.chunks.clear(); 
+                this.engine.grid.deserialize(mapPayload);
+                this.startGameProcess(true);
+            }
+        };
+
+        this.network.onPlayerMoved = (peerId, payload) => {
+            if (!this.remotePlayers[peerId]) {
+                this.remotePlayers[peerId] = new Player(payload.x, payload.y);
+                this.remotePlayers[peerId].color = '#e74c3c';
+            }
+            this.remotePlayers[peerId].x = payload.x;
+            this.remotePlayers[peerId].y = payload.y;
+            this.remotePlayers[peerId].facingX = payload.facingX;
+            this.remotePlayers[peerId].facingY = payload.facingY;
+        };
+
+        this.network.onActionReceived = (peerId, payload) => {
+            const { action, x, y, blockId } = payload;
+            if (action === 'placeBlock' && BLOCKS[blockId]) {
+                this.engine.grid.setCell(x, y, BLOCKS[blockId]);
+            }
+        };
+
+        this.network.onPlayerLeft = (peerId) => {
+            delete this.remotePlayers[peerId];
+        };
+    }
+
+    startGameProcess(isGuestAndConnected) {
+        this.ui.destroyLobby();
+        this.engine.camera.zoom = 2;
+        
+        const hasPlayedIntro = localStorage.getItem('islandCrafter_playedIntro') === 'true';
+
+        if (hasPlayedIntro || isGuestAndConnected) {
             this.state = 'PLAYING';
-            this.hudOverlay.style.display = 'block';
-            engine.debugDisplay.setCustomData('Statut', 'Jeu en cours (Chargé)');
+            this.ui.hudOverlay.style.display = 'block';
+            this.engine.debugDisplay.setCustomData('Statut', 'Jeu en cours');
         } else {
-            generateIsland(engine);
-            
             this.state = 'CINEMATIC';
-            this.hudOverlay.style.display = 'none';
-            this.startCinematic(engine);
+            this.ui.hudOverlay.style.display = 'none';
+            this.ui.startCinematic();
         }
-    }
-
-    initHUD() {
-        this.hudOverlay = document.createElement('div');
-        this.hudOverlay.style.position = 'absolute';
-        this.hudOverlay.style.bottom = '20px';
-        this.hudOverlay.style.left = '50%';
-        this.hudOverlay.style.transform = 'translateX(-50%)';
-        this.hudOverlay.style.background = 'rgba(0,0,0,0.8)';
-        this.hudOverlay.style.color = '#fff';
-        this.hudOverlay.style.padding = '10px 20px';
-        this.hudOverlay.style.borderRadius = '30px';
-        this.hudOverlay.style.fontFamily = 'monospace';
-        this.hudOverlay.style.fontSize = '1.2rem';
-        this.hudOverlay.style.boxShadow = '0 5px 15px rgba(0,0,0,0.4)';
-        this.hudOverlay.style.pointerEvents = 'none';
-        this.hudOverlay.style.border = '2px solid rgba(255,255,255,0.1)';
-        this.hudOverlay.style.display = 'none'; 
-        document.body.appendChild(this.hudOverlay);
-        this.updateHUD();
-    }
-
-    updateHUD() {
-        if (!this.hudOverlay) return;
-        const woodCount = this.player.inventory['wood'] || 0;
-        const stoneCount = this.player.inventory['stone'] || 0;
-        this.hudOverlay.innerHTML = `
-            <div style="text-align: center; margin-bottom: 5px;">🎒 Inventaire</div>
-            <div style="font-size:1.1rem; display: flex; gap: 15px; justify-content: center;">
-                <span>Bois: <b style="color: #f1c40f;">${woodCount}</b></span>
-                <span>Pierre: <b style="color: #bdc3c7;">${stoneCount}</b></span>
-            </div>
-        `;
-    }
-
-    startCinematic(engine) {
-        engine.camera.x = -600;
-        engine.camera.y = -600;
-        engine.camera.zoom = 1;
-        this.cinematicTime = 0;
-
-        this.introOverlay = document.createElement('div');
-        this.introOverlay.style.position = 'absolute';
-        this.introOverlay.style.top = '0';
-        this.introOverlay.style.left = '0';
-        this.introOverlay.style.width = '100%';
-        this.introOverlay.style.height = '100%';
-        this.introOverlay.style.pointerEvents = 'none'; 
-        this.introOverlay.style.display = 'flex';
-        this.introOverlay.style.alignItems = 'center';
-        this.introOverlay.style.justifyContent = 'center';
-        
-        this.introOverlay.innerHTML = `
-            <div style="background: rgba(0,0,0,0.85); color: #fff; padding: 40px; border-radius: 12px; pointer-events: auto; max-width: 500px; text-align: center; font-family: 'Segoe UI', sans-serif; box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(10px); opacity: 0; transition: opacity 2s ease-in-out;" id="cinematic-box">
-                <h1 style="color: #f1c40f; margin-bottom: 20px; font-size: 2rem;">Bienvenue sur AnimoTraversent</h1>
-                <p style="font-size: 1.1rem; line-height: 1.5; color: #dfe6e9; margin-bottom: 30px;">
-                    Vous venez d'échouer sur une île vierge générée de manière unique.<br><br>
-                    Utilisez <b>Z Q S D</b> ou les <b>Flèches</b> pour vous déplacer. Attention à ne pas tomber à l'eau !<br><br>
-                    Vous avez du matériel dans votre inventaire pour commencer à aménager l'île.
-                </p>
-                <button id="skip-intro" style="padding: 12px 24px; background: #0984e3; color: white; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 1.1rem; transition: background 0.2s;">Démarrer l'Aventure</button>
-            </div>
-        `;
-
-        document.body.appendChild(this.introOverlay);
-        
-        setTimeout(() => {
-            const box = document.getElementById('cinematic-box');
-            if(box) box.style.opacity = '1';
-        }, 500);
-
-        document.getElementById('skip-intro').addEventListener('click', () => {
-            this.endCinematic(engine);
-        });
-    }
-
-    endCinematic(engine) {
-        if (this.introOverlay) {
-            this.introOverlay.style.opacity = '0';
-            setTimeout(() => {
-                if(this.introOverlay) this.introOverlay.remove();
-                this.introOverlay = null;
-            }, 1000);
-        }
-        
-        localStorage.setItem('islandCrafter_playedIntro', 'true');
-        engine.storageManager.save(); 
-        
-        this.state = 'PLAYING';
-        this.hudOverlay.style.display = 'block';
-        engine.camera.zoom = 2; 
-        engine.debugDisplay.setCustomData('Statut', 'Jeu en cours');
     }
 
     handleInputs(engine) {
-        // Ignorer l'ancien système de souris
     }
 
     handleKeyDown(e) {
         if (this.state !== 'PLAYING' || !this.engine) return;
 
         if (e.code === 'Space') {
-            e.preventDefault(); // Eviter scroll de la page
+            e.preventDefault();
             this.tryPlaceBlock();
         }
     }
@@ -176,7 +129,6 @@ class IslandCrafter {
         const activeBlockId = this.player.selectedBlockId;
         const currentCell = this.engine.grid.getCell(cellX, cellY);
         
-        // INTERACTION : Récolte (Bûcheronnage / Minage)
         if (currentCell && currentCell.harvestable) {
             const dropId = currentCell.drops;
             const amount = currentCell.dropAmount || 1;
@@ -184,14 +136,17 @@ class IslandCrafter {
             this.player.inventory[dropId] = (this.player.inventory[dropId] || 0) + amount;
             this.engine.grid.setCell(cellX, cellY, BLOCKS[currentCell.floor]);
             
+            this.network.broadcast({
+                type: 'action',
+                payload: { action: 'placeBlock', x: cellX, y: cellY, blockId: currentCell.floor }
+            }, []);
+
             this.savePlayer();
-            this.updateHUD();
+            this.ui.updateHUD();
             return;
         }
 
-        // Retirer un pont existant et rendre le rondin de bois
         if (currentCell && currentCell.id === activeBlockId) {
-            // Analyse de l'environnement pour déduire la profondeur originale
             let deepCount = 0;
             const neighbors = [
                 this.engine.grid.getCell(cellX - 1, cellY),
@@ -206,13 +161,18 @@ class IslandCrafter {
                 }
             }
 
-            // Si au moins 2 voisins sont profonds, on déduit qu'on était en eau profonde
             const restoredBlock = deepCount >= 2 ? BLOCKS.deep_water : BLOCKS.water;
 
             this.engine.grid.setCell(cellX, cellY, restoredBlock);
+
+            this.network.broadcast({
+                type: 'action',
+                payload: { action: 'placeBlock', x: cellX, y: cellY, blockId: restoredBlock.id }
+            }, []);
+
             this.player.inventory[activeBlockId]++;
             this.savePlayer();
-            this.updateHUD();
+            this.ui.updateHUD();
             return;
         }
 
@@ -222,17 +182,22 @@ class IslandCrafter {
             const blockObj = BLOCKS[activeBlockId];
             
             if (blockObj.placeable) {
-                // Restriction logic: Only let the player build bridges (wood) on water!
                 const isWater = currentCell && (currentCell.id === 'water' || currentCell.id === 'deep_water');
                 
                 if (activeBlockId === 'wood' && (!isWater)) {
-                    return; // Annuler si on n'est pas sur de l'eau
+                    return;
                 }
 
                 this.engine.grid.setCell(cellX, cellY, blockObj);
+
+                this.network.broadcast({
+                    type: 'action',
+                    payload: { action: 'placeBlock', x: cellX, y: cellY, blockId: blockObj.id }
+                }, []);
+
                 this.player.inventory[activeBlockId]--;
                 this.savePlayer();
-                this.updateHUD();
+                this.ui.updateHUD();
             }
         }
     }
@@ -263,6 +228,29 @@ class IslandCrafter {
             
             this.player.update(dt, engine.inputManager, engine.grid, engine.cellSize);
             
+            this.networkSyncTimer = (this.networkSyncTimer || 0) + dt;
+            if (this.networkSyncTimer > 0.05) {
+                if (this.player.x !== this.lastSentX || this.player.y !== this.lastSentY || 
+                    this.player.facingX !== this.lastSentFacingX || this.player.facingY !== this.lastSentFacingY) {
+                    
+                    this.network.broadcast({
+                        type: 'playerMoved',
+                        payload: {
+                            x: this.player.x,
+                            y: this.player.y,
+                            facingX: this.player.facingX,
+                            facingY: this.player.facingY
+                        }
+                    }, []);
+                    
+                    this.lastSentX = this.player.x;
+                    this.lastSentY = this.player.y;
+                    this.lastSentFacingX = this.player.facingX;
+                    this.lastSentFacingY = this.player.facingY;
+                }
+                this.networkSyncTimer = 0;
+            }
+
             const targetCamX = engine.canvas.width / 2 - this.player.x * engine.camera.zoom;
             const targetCamY = engine.canvas.height / 2 - this.player.y * engine.camera.zoom;
             
@@ -276,6 +264,9 @@ class IslandCrafter {
 
     onRender(ctx, camera) {
         this.player.draw(ctx);
+        for (const peerId in this.remotePlayers) {
+            this.remotePlayers[peerId].draw(ctx);
+        }
     }
 }
 
