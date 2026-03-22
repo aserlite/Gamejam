@@ -17,38 +17,44 @@ export const BLOCKS = {
         id: 'abyss',
         name: 'Océan',
         color: '#091c52',
-        solid: true
+        solid: true,
+        texture: 'abyss'
     },
     deep_water: {
         id: 'deep_water',
         name: 'Eau Profonde',
         color: '#1e3799',
-        solid: true
+        solid: true,
+        texture: 'deep_water'
     },
     water: {
         id: 'water',
         name: 'Eau',
         color: '#4a69bd',
-        solid: true
+        solid: true,
+        texture: 'water'
     },
     sand: {
         id: 'sand',
         name: 'Sable',
         color: '#fad390',
-        solid: false
+        solid: false,
+        texture: 'sand'
     },
     grass: {
         id: 'grass',
         name: 'Herbe',
         color: '#78e08f',
-        solid: false
+        solid: false,
+        texture: 'grass'
     },
     wood: {
         id: 'wood',
         name: 'Pont en Bois',
         color: '#d35400',
         solid: false,
-        placeable: true
+        placeable: true,
+        texture: 'wood_bridge'
     },
     tree: {
         id: 'tree',
@@ -58,7 +64,8 @@ export const BLOCKS = {
         harvestable: true,
         drops: 'wood',
         dropAmount: 2,
-        floor: 'grass'
+        floor: 'grass',
+        texture: 'tree'
     },
     rock: {
         id: 'rock',
@@ -68,27 +75,31 @@ export const BLOCKS = {
         harvestable: true,
         drops: 'stone',
         dropAmount: 2,
-        floor: 'sand'
+        floor: 'sand',
+        texture: 'rock'
     },
     wood_wall: {
         id: 'wood_wall',
         name: 'Mur en bois',
         color: '#e67e22',
         solid: true,
-        placeable: true
+        placeable: true,
+        texture: 'wood_wall'
     },
     house_wall: {
         id: 'house_wall',
         name: 'Mur Foyer',
         color: '#2c3e50',
-        solid: true
+        solid: true,
+        texture: 'wall'
     },
     plank_floor: {
         id: 'plank_floor',
         name: 'Plancher',
         color: '#8c7050',
         solid: false,
-        placeable: true
+        placeable: true,
+        texture: 'floor'
     },
     house_door: {
         id: 'house_door',
@@ -97,7 +108,8 @@ export const BLOCKS = {
         solid: true,
         interactable: true,
         teleport: 'inside',
-        placeable: true
+        placeable: true,
+        texture: 'door'
     },
     house_structure: {
         id: 'house_structure',

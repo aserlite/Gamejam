@@ -15,8 +15,8 @@ export class TomPlouk {
         this.moveTimer = 0;
         this.idleTimer = 0;
         
-        this.sprite = new window.Image();
-        this.sprite.src = '/tom_ploukferme.webp';
+        this.spriteName = 'tom_ploukferme';
+        this.textureManager = null;
         
         this.currentQuestIndex = parseInt(localStorage.getItem('islandCrafter_tom_quest') || '0');
     }
@@ -89,8 +89,11 @@ export class TomPlouk {
             ctx.rotate(tilt);
         }
 
-        if (this.sprite.complete) {
-            ctx.drawImage(this.sprite, -this.width / 2, -this.height / 2, this.width, this.height);
+        if (this.textureManager) {
+            const img = this.textureManager.getTexture(this.spriteName);
+            if (img) {
+                ctx.drawImage(img, -this.width / 2, -this.height / 2, this.width, this.height);
+            }
         } else {
             ctx.fillStyle = '#e67e22'; 
             ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
@@ -102,6 +105,22 @@ export class TomPlouk {
     interact(player, showMessageCallback, onSuccessCallback) {
         const currentQuest = TOM_PLOUK_QUESTS[this.currentQuestIndex];
         if (!currentQuest) return;
+
+        if (currentQuest.isThiefQuest) {
+            this.thiefCounter = (this.thiefCounter || 0) + 1;
+            const dialogues = currentQuest.thiefDialogues || [];
+            const msg = dialogues[Math.min(this.thiefCounter - 1, dialogues.length - 1)];
+            
+            if (this.thiefCounter >= (currentQuest.thiefMax || 4)) {
+                for (let item in player.inventory) {
+                    player.inventory[item] = 0;
+                }
+                this.thiefCounter = 0; // reset
+            }
+            
+            showMessageCallback(msg);
+            return false;
+        }
 
         let meetsRequirements = true;
         for (const [item, count] of Object.entries(currentQuest.requirements)) {

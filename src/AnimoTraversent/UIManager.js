@@ -411,4 +411,9 @@ export class UIManager {
             box.style.display = 'none';
         }, 4000);
     }
+
+    onAssetsLoaded() {
+        this.talkFrame1 = this.main.engine.textureManager.getTexture('tom_ploukferme');
+        this.talkFrame2 = this.main.engine.textureManager.getTexture('tom_ploukbouche');
+    }
 }

@@ -8,6 +8,23 @@ import { TomPlouk } from './AnimoTraversent/TomPlouk.js';
 
 window.BLOCKS = BLOCKS;
 
+const SPRITE_MANIFEST = {
+    'tom_ploukferme': '/tom_ploukferme.webp',
+    'tom_ploukbouche': '/tom_ploukbouche.webp',
+    'grass': '/sprites/grass.png',
+    'sand': '/sprites/sand.png',
+    'water': '/sprites/water.png',
+    'deep_water': '/sprites/deep_water.png',
+    'abyss': '/sprites/abyss.png',
+    'wall': '/sprites/wall.png',
+    'floor': '/sprites/floor.png',
+    'door': '/sprites/door.png',
+    'rock': '/sprites/rock.png',
+    'tree': '/sprites/tree.png',
+    'wood_bridge': '/sprites/wood_bridge.png',
+    'wood_wall': '/sprites/wood_wall.png'
+};
+
 class IslandCrafter {
     constructor() {
         this.player = new Player(0, 0); 
@@ -109,6 +126,12 @@ class IslandCrafter {
         this.ui.updateHUD();
         this.ui.showLobby(dataLoaded);
         this.setupCoreNetworking();
+        
+        engine.textureManager.loadAll(SPRITE_MANIFEST).then(() => {
+            console.log("[IslandCrafter] All sprites loaded");
+            this.npc.textureManager = engine.textureManager;
+            this.ui.onAssetsLoaded();
+        });
     }
 
     setupCoreNetworking() {
@@ -542,8 +565,15 @@ class IslandCrafter {
                     ctx.fillStyle = '#ecf0f1';
                     ctx.fillRect(cx - cs, cy - cs, cs * 3, cs * 2);
                     
-                    ctx.fillStyle = cell.color;
-                    ctx.fillRect(cx, cy, cs, cs);
+                    if (cell.texture) {
+                        const img = this.engine.textureManager.getTexture(cell.texture);
+                        if (img) {
+                            ctx.drawImage(img, cx, cy, cs, cs);
+                        }
+                    } else {
+                        ctx.fillStyle = cell.color;
+                        ctx.fillRect(cx, cy, cs, cs);
+                    }
                     
                     ctx.fillStyle = '#c0392b';
                     ctx.beginPath();
@@ -573,8 +603,15 @@ class IslandCrafter {
 
             const cell = this.engine.grid.getCell(this.targetHarvestX, this.targetHarvestY);
             if (cell) {
-                ctx.fillStyle = cell.color;
-                ctx.fillRect(px + shakeX, py + shakeY, this.engine.cellSize, this.engine.cellSize);
+                if (cell.texture) {
+                    const img = this.engine.textureManager.getTexture(cell.texture);
+                    if (img) {
+                        ctx.drawImage(img, px + shakeX, py + shakeY, this.engine.cellSize, this.engine.cellSize);
+                    }
+                } else {
+                    ctx.fillStyle = cell.color;
+                    ctx.fillRect(px + shakeX, py + shakeY, this.engine.cellSize, this.engine.cellSize);
+                }
             }
 
             const progress = Math.min(1, this.harvestTimer / 0.6);

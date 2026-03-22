@@ -15,9 +15,15 @@ export const TOM_PLOUK_QUESTS = [
     },
     {
         id: "quest_end",
-        dialoguePending: "Casse toi gros con",
-        dialogueSuccess: "Casse toi gros con",
+        dialoguePending: "Casse toi maintenant",
+        dialogueSuccess: "Casse toi maintenant",
         requirements: {},
-        rewards: {}
+        rewards: {},
+        isThiefQuest: true,
+        thiefMax: 2,
+        thiefDialogues: [
+            "Ca va te meler bètement la",
+            "Az tu m'a vnr file ton tel",
+        ]
     }
 ];
