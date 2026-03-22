@@ -375,6 +375,11 @@ class IslandCrafter {
                 }
 
                 if (activeBlockId === 'house_door') {
+                    const validFloors = ['grass', 'wood'];
+                    if (!currentCell || !validFloors.includes(currentCell.id)) {
+                        return;
+                    }
+
                     let canBuild = true;
                     const offsets = [
                         { dx: 0, dy: -3 },
