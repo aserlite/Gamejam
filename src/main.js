@@ -22,7 +22,15 @@ const SPRITE_MANIFEST = {
     'rock': '/sprites/rock.png',
     'tree': '/sprites/tree.png',
     'wood_bridge': '/sprites/wood_bridge.png',
-    'wood_wall': '/sprites/wood_wall.png'
+    'wood_wall': '/sprites/wood_wall.png',
+    'player_up': '/sprites/player_up.png',
+    'player_down': '/sprites/player_down.png',
+    'player_left': '/sprites/player_left.png',
+    'player_right': '/sprites/player_right.png',
+    'player_up_left': '/sprites/player_up_left.png',
+    'player_up_right': '/sprites/player_up_right.png',
+    'player_down_left': '/sprites/player_down_left.png',
+    'player_down_right': '/sprites/player_down_right.png'
 };
 
 class IslandCrafter {
@@ -130,6 +138,7 @@ class IslandCrafter {
         engine.textureManager.loadAll(SPRITE_MANIFEST).then(() => {
             console.log("[IslandCrafter] All sprites loaded");
             this.npc.textureManager = engine.textureManager;
+            this.player.textureManager = engine.textureManager;
             this.ui.onAssetsLoaded();
         });
     }

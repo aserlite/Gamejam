@@ -18,6 +18,7 @@ export class Player {
 
         this.facingX = 0;
         this.facingY = 1;
+        this.textureManager = null;
     }
 
     get selectedBlockId() {
@@ -48,13 +49,8 @@ export class Player {
         }
 
         if (Math.abs(vx) > 0 || Math.abs(vy) > 0) {
-            if (Math.abs(vx) > Math.abs(vy)) {
-                this.facingX = vx > 0 ? 1 : -1;
-                this.facingY = 0;
-            } else {
-                this.facingX = 0;
-                this.facingY = vy > 0 ? 1 : -1;
-            }
+            this.facingX = Math.round(vx);
+            this.facingY = Math.round(vy);
         }
 
         if (vx !== 0) {
@@ -96,6 +92,15 @@ export class Player {
     }
 
     draw(ctx) {
+        if (this.textureManager) {
+            const spriteName = this.getSpriteName();
+            const img = this.textureManager.getTexture(spriteName);
+            if (img) {
+                ctx.drawImage(img, this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+                return;
+            }
+        }
+
         ctx.fillStyle = this.color;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.width / 2, 0, Math.PI * 2);
@@ -114,5 +119,19 @@ export class Player {
         ctx.moveTo(this.x, this.y);
         ctx.lineTo(this.x + this.facingX * (this.width), this.y + this.facingY * (this.height));
         ctx.stroke();
+    }
+
+    getSpriteName() {
+        const x = this.facingX;
+        const y = this.facingY;
+        if (x === 0 && y === -1) return 'player_up';
+        if (x === 0 && y === 1) return 'player_down';
+        if (x === -1 && y === 0) return 'player_left';
+        if (x === 1 && y === 0) return 'player_right';
+        if (x === -1 && y === -1) return 'player_up_left';
+        if (x === 1 && y === -1) return 'player_up_right';
+        if (x === -1 && y === 1) return 'player_down_left';
+        if (x === 1 && y === 1) return 'player_down_right';
+        return 'player_down';
     }
 }
