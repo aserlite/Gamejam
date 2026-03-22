@@ -218,13 +218,13 @@ export class UIManager {
         
         this.introOverlay.innerHTML = `
             <div style="width: 500px; height: 500px; margin-bottom: 2rem; position: relative;">
-                <img id="cine-frame-1" src="/tom_ploukferme.webp" style="position:absolute; width:100%; height:100%; object-fit:contain; display:block;">
-                <img id="cine-frame-2" src="/tom_ploukbouche.webp" style="position:absolute; width:100%; height:100%; object-fit:contain; display:none;">
+                <img id="cine-frame-1" src="tom_ploukferme.webp" style="position:absolute; width:100%; height:100%; object-fit:contain; display:block;">
+                <img id="cine-frame-2" src="tom_ploukbouche.webp" style="position:absolute; width:100%; height:100%; object-fit:contain; display:none;">
             </div>
             <div style="width: 80%; max-width: 800px; min-height: 120px; padding: 20px; box-sizing: border-box; font-family: 'Segoe UI', sans-serif;">
                 <p id="cine-text" style="font-size: 1.5rem; color: #fff; margin: 0; line-height: 1.5; min-height: 4.5rem; white-space: pre-wrap;"></p>
                 <div id="cine-prompt" style="text-align: right; margin-top: 15px; display: none; animation: flash 1.5s infinite;">
-                    <img src="/space.gif" style="height: 60px; width: auto; filter: brightness(0) invert(1); object-fit: contain;" />
+                    <img src="space.gif" style="height: 60px; width: auto; filter: brightness(0) invert(1); object-fit: contain;" />
                 </div>
             </div>
             <style>
@@ -241,7 +241,7 @@ export class UIManager {
         this.cineTypeInterval = null;
         this.cineTalkInterval = null;
 
-        this.cineBGM = new Audio('/cinematic_bgm.mp3');
+        this.cineBGM = new Audio('cinematic_bgm.mp3');
         this.cineBGM.loop = true;
         this.cineBGM.volume = 0.1;
         this.cineBGM.play().catch(e => console.log("Audio play blocked", e));
@@ -291,7 +291,7 @@ export class UIManager {
             } while (nextSFX === this.lastTalkSFX && this.talkSFXPoolSize > 1);
             
             this.lastTalkSFX = nextSFX;
-            this.cineTalkSFX.src = `/talk_sfx/talk${nextSFX}.mp3`;
+            this.cineTalkSFX.src = `talk_sfx/talk${nextSFX}.mp3`;
             this.cineTalkSFX.play().catch(e => {});
         }
 
