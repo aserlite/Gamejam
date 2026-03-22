@@ -110,7 +110,7 @@ export const BLOCKS = {
         id: 'house_exit',
         name: 'Sortie',
         color: '#c0392b',
-        solid: false,
+        solid: true,
         interactable: true,
         teleport: 'outside'
     }

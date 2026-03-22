@@ -145,10 +145,15 @@ export class Grid {
      */
     deserialize(jsonString) {
         this.chunks.clear();
-        if (!jsonString) return;
+        if (!jsonString) {
+            console.log("[Grid] deserialize called with empty string");
+            return;
+        }
         
         try {
+            console.log(`[Grid] JSON parse init, string length: ${jsonString.length}`);
             const data = JSON.parse(jsonString);
+            console.log(`[Grid] Loaded ${data.length} chunks from JSON`);
             for (const chunkData of data) {
                 const chunk = new Chunk(chunkData.x, chunkData.y);
                 for (const cell of chunkData.c) {
@@ -168,8 +173,10 @@ export class Grid {
                 }
                 this.chunks.set(this._getChunkKey(chunk.x, chunk.y), chunk);
             }
+            console.log(`[Grid] Restore success. Total chunks in memory: ${this.chunks.size}`);
         } catch (e) {
-            console.error("Erreur lors de la désérialisation de la grille :", e);
+            console.error("[Grid] Erreur lors de la désérialisation de la grille :", e);
+            throw e;
         }
     }
 }

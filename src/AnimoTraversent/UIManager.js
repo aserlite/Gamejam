@@ -1,4 +1,5 @@
 import { generateIsland } from './MapGenerator.js';
+import { CINEMATIC_DIALOGUES } from './CinematicText.js';
 
 export class UIManager {
     constructor(app) {
@@ -139,7 +140,10 @@ export class UIManager {
     setupLobbyHooks(dataLoaded) {
         document.getElementById('btn-solo').addEventListener('click', () => {
             this.app.network.isHost = true;
-            if (!dataLoaded) generateIsland(this.app.engine);
+            if (!dataLoaded) {
+                generateIsland(this.app.engine);
+                this.app.engine.storageManager.save();
+            }
             this.app.startGameProcess(false);
         });
 
@@ -154,7 +158,10 @@ export class UIManager {
                 codeDisplay.innerHTML = `Code Île:<br><span style="user-select: all; background: #222; padding: 5px; border-radius: 4px; display: inline-block; margin-top: 5px;">${roomCode}</span>`;
                 btnHost.innerText = "Serveur Ouvert !";
                 
-                if (!dataLoaded) generateIsland(this.app.engine);
+                if (!dataLoaded) {
+                    generateIsland(this.app.engine);
+                    this.app.engine.storageManager.save();
+                }
                 
                 const startBtn = document.createElement('button');
                 startBtn.innerText = "Jouer sur mon Serveur";
@@ -202,42 +209,158 @@ export class UIManager {
         this.introOverlay.style.left = '0';
         this.introOverlay.style.width = '100%';
         this.introOverlay.style.height = '100%';
-        this.introOverlay.style.pointerEvents = 'none'; 
+        this.introOverlay.style.background = '#111'; 
+        this.introOverlay.style.zIndex = '200';
         this.introOverlay.style.display = 'flex';
+        this.introOverlay.style.flexDirection = 'column';
         this.introOverlay.style.alignItems = 'center';
         this.introOverlay.style.justifyContent = 'center';
         
         this.introOverlay.innerHTML = `
-            <div style="background: rgba(0,0,0,0.85); color: #fff; padding: 40px; border-radius: 12px; pointer-events: auto; max-width: 500px; text-align: center; font-family: 'Segoe UI', sans-serif; box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(10px); opacity: 0; transition: opacity 2s ease-in-out;" id="cinematic-box">
-                <h1 style="color: #f1c40f; margin-bottom: 20px; font-size: 2rem;">Bienvenue sur AnimoTraversent</h1>
-                <p style="font-size: 1.1rem; line-height: 1.5; color: #dfe6e9; margin-bottom: 30px;">
-                    Vous venez d'échouer sur une île vierge générée de manière unique.<br><br>
-                    Utilisez <b>Z Q S D</b> ou les <b>Flèches</b> pour vous déplacer. Attention à ne pas tomber à l'eau !<br><br>
-                    Vous avez du matériel dans votre inventaire pour commencer à aménager l'île.
-                </p>
-                <button id="skip-intro" style="padding: 12px 24px; background: #0984e3; color: white; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 1.1rem; transition: background 0.2s;">Démarrer l'Aventure</button>
+            <div style="width: 500px; height: 500px; margin-bottom: 2rem; position: relative;">
+                <img id="cine-frame-1" src="/tom_ploukferme.webp" style="position:absolute; width:100%; height:100%; object-fit:contain; display:block;">
+                <img id="cine-frame-2" src="/tom_ploukbouche.webp" style="position:absolute; width:100%; height:100%; object-fit:contain; display:none;">
             </div>
+            <div style="width: 80%; max-width: 800px; min-height: 120px; padding: 20px; box-sizing: border-box; font-family: 'Segoe UI', sans-serif;">
+                <p id="cine-text" style="font-size: 1.5rem; color: #fff; margin: 0; line-height: 1.5; min-height: 4.5rem; white-space: pre-wrap;"></p>
+                <div id="cine-prompt" style="text-align: right; margin-top: 15px; display: none; animation: flash 1.5s infinite;">
+                    <img src="/space.gif" style="height: 60px; width: auto; filter: brightness(0) invert(1); object-fit: contain;" />
+                </div>
+            </div>
+            <style>
+                @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+            </style>
         `;
 
         document.body.appendChild(this.introOverlay);
         
-        setTimeout(() => {
-            const box = document.getElementById('cinematic-box');
-            if(box) box.style.opacity = '1';
-        }, 500);
+        this.cineDialogues = CINEMATIC_DIALOGUES;
+        this.cineIndex = 0;
+        this.cineCharIndex = 0;
+        this.cineIsTyping = false;
+        this.cineTypeInterval = null;
+        this.cineTalkInterval = null;
 
-        document.getElementById('skip-intro').addEventListener('click', () => {
-            this.endCinematic();
-        });
+        this.cineBGM = new Audio('/cinematic_bgm.mp3');
+        this.cineBGM.loop = true;
+        this.cineBGM.volume = 0.1;
+        this.cineBGM.play().catch(e => console.log("Audio play blocked", e));
+
+        this.cineTalkSFX = new Audio();
+        this.cineTalkSFX.loop = true;
+        this.cineTalkSFX.volume = 0.45;
+        this.lastTalkSFX = -1;
+        this.talkSFXPoolSize = 1;
+
+        this.showNextDialogue();
+
+        this.cineKeyHandler = (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (this.cineIsTyping) {
+                    this.completeDialogue();
+                } else {
+                    this.cineIndex++;
+                    if (this.cineIndex >= this.cineDialogues.length) {
+                        this.endCinematic();
+                    } else {
+                        this.showNextDialogue();
+                    }
+                }
+            }
+        };
+        window.addEventListener('keydown', this.cineKeyHandler);
+    }
+
+    showNextDialogue() {
+        this.cineCharIndex = 0;
+        this.cineIsTyping = true;
+        const textElement = document.getElementById('cine-text');
+        const promptElement = document.getElementById('cine-prompt');
+        if (!textElement) return;
+        textElement.textContent = '';
+        if (promptElement) promptElement.style.display = 'none';
+
+        if (this.cineTypeInterval) clearInterval(this.cineTypeInterval);
+        if (this.cineTalkInterval) clearInterval(this.cineTalkInterval);
+        
+        if (this.cineTalkSFX) {
+            let nextSFX;
+            do {
+                nextSFX = Math.floor(Math.random() * this.talkSFXPoolSize) + 1;
+            } while (nextSFX === this.lastTalkSFX && this.talkSFXPoolSize > 1);
+            
+            this.lastTalkSFX = nextSFX;
+            this.cineTalkSFX.src = `/talk_sfx/talk${nextSFX}.mp3`;
+            this.cineTalkSFX.play().catch(e => {});
+        }
+
+        const currentText = this.cineDialogues[this.cineIndex] || "";
+
+        const frame1 = document.getElementById('cine-frame-1');
+        const frame2 = document.getElementById('cine-frame-2');
+        let isFrame1 = true;
+        this.cineTalkInterval = setInterval(() => {
+            isFrame1 = !isFrame1;
+            if (frame1 && frame2) {
+                frame1.style.display = isFrame1 ? 'block' : 'none';
+                frame2.style.display = isFrame1 ? 'none' : 'block';
+            }
+        }, 150);
+
+        this.cineTypeInterval = setInterval(() => {
+            if (this.cineCharIndex < currentText.length) {
+                textElement.textContent += currentText.charAt(this.cineCharIndex);
+                this.cineCharIndex++;
+            } else {
+                this.completeDialogue();
+            }
+        }, 40);
+    }
+
+    completeDialogue() {
+        this.cineIsTyping = false;
+        clearInterval(this.cineTypeInterval);
+        clearInterval(this.cineTalkInterval);
+        
+        if (this.cineTalkSFX) {
+            this.cineTalkSFX.pause();
+            this.cineTalkSFX.currentTime = 0;
+        }
+
+        const frame1 = document.getElementById('cine-frame-1');
+        const frame2 = document.getElementById('cine-frame-2');
+        if (frame1 && frame2) {
+            frame1.style.display = 'block';
+            frame2.style.display = 'none';
+        }
+
+        const textElement = document.getElementById('cine-text');
+        const promptElement = document.getElementById('cine-prompt');
+        if (textElement) textElement.textContent = this.cineDialogues[this.cineIndex] || "";
+        if (promptElement) promptElement.style.display = 'block';
     }
 
     endCinematic() {
+        if (this.cineKeyHandler) {
+            window.removeEventListener('keydown', this.cineKeyHandler);
+            this.cineKeyHandler = null;
+        }
+        if (this.cineTypeInterval) clearInterval(this.cineTypeInterval);
+        if (this.cineTalkInterval) clearInterval(this.cineTalkInterval);
+        
+        if (this.cineBGM) {
+            this.cineBGM.pause();
+            this.cineBGM = null;
+        }
+        if (this.cineTalkSFX) {
+            this.cineTalkSFX.pause();
+            this.cineTalkSFX = null;
+        }
+
         if (this.introOverlay) {
-            this.introOverlay.style.opacity = '0';
-            setTimeout(() => {
-                if(this.introOverlay) this.introOverlay.remove();
-                this.introOverlay = null;
-            }, 1000);
+            this.introOverlay.remove();
+            this.introOverlay = null;
         }
         
         localStorage.setItem('islandCrafter_playedIntro', 'true');
@@ -254,5 +377,38 @@ export class UIManager {
             this.menuOverlay.remove();
             this.menuOverlay = null;
         }
+    }
+
+    showNPCDialogue(name, message) {
+        let box = document.getElementById('npc-dialogue');
+        if (!box) {
+            box = document.createElement('div');
+            box.id = 'npc-dialogue';
+            box.style.position = 'absolute';
+            box.style.top = '20px';
+            box.style.left = '50%';
+            box.style.transform = 'translateX(-50%)';
+            box.style.background = 'rgba(0,0,0,0.85)';
+            box.style.backdropFilter = 'blur(10px)';
+            box.style.border = '2px solid #f1c40f';
+            box.style.color = 'white';
+            box.style.padding = '12px 30px';
+            box.style.borderRadius = '30px';
+            box.style.fontFamily = "'Segoe UI', sans-serif";
+            box.style.minWidth = '400px';
+            box.style.textAlign = 'center';
+            box.style.zIndex = '150';
+            box.style.pointerEvents = 'none';
+            box.style.boxShadow = '0 5px 25px rgba(0,0,0,0.5)';
+            document.body.appendChild(box);
+        }
+        
+        box.innerHTML = `<h3 style="margin: 0 0 10px 0; color: #f1c40f;">${name}</h3><p style="margin: 0; font-size: 1.1rem; line-height: 1.5;">${message}</p>`;
+        box.style.display = 'block';
+        
+        if (this.dialogueTimeout) clearTimeout(this.dialogueTimeout);
+        this.dialogueTimeout = setTimeout(() => {
+            box.style.display = 'none';
+        }, 4000);
     }
 }

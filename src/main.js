@@ -4,6 +4,7 @@ import { BLOCKS } from './AnimoTraversent/BlockDictionary.js';
 import { NetworkManager } from './AnimoTraversent/NetworkManager.js';
 import { UIManager } from './AnimoTraversent/UIManager.js';
 import { generateHouseRegion } from './AnimoTraversent/HouseGenerator.js';
+import { TomPlouk } from './AnimoTraversent/TomPlouk.js';
 
 window.BLOCKS = BLOCKS;
 
@@ -25,6 +26,8 @@ class IslandCrafter {
         this.network = new NetworkManager();
         this.remotePlayers = {};
         this.ui = new UIManager(this);
+        
+        this.npc = new TomPlouk(100, -100);
 
         this.handleKeyDown = this.handleKeyDown.bind(this);
         window.addEventListener('keydown', this.handleKeyDown);
@@ -58,8 +61,15 @@ class IslandCrafter {
     onReset() {
         localStorage.removeItem('islandCrafter_playedIntro');
         localStorage.removeItem('islandCrafter_player');
+        localStorage.removeItem('islandCrafter_tom_quest');
+        
         this.player.inventory = { wood: 0, stone: 0, wood_wall: 0, house_door: 1 };
         this.player.hotbar = ['empty_hand', 'wood', 'wood_wall', 'campfire', 'house_door'];
+        this.remotePlayers = {};
+        
+        if (this.npc) this.npc.currentQuestIndex = 0;
+        this.houseRadius = 3;
+        
         this.state = 'INIT';
     }
 
@@ -76,10 +86,17 @@ class IslandCrafter {
         if (savedPlayer) {
             try {
                 const pData = JSON.parse(savedPlayer);
-                if (pData && pData.inventory) {
-                    this.player.inventory = pData.inventory;
+                if (pData) {
+                    if (pData.inventory) this.player.inventory = pData.inventory;
+                    if (pData.x !== undefined) this.player.x = pData.x;
+                    if (pData.y !== undefined) this.player.y = pData.y;
+                    if (pData.lastOverworldX !== undefined) this.lastOverworldX = pData.lastOverworldX;
+                    if (pData.lastOverworldY !== undefined) this.lastOverworldY = pData.lastOverworldY;
+                    this.houseRadius = pData.houseRadius || 5;
                 }
             } catch(e) {}
+        } else {
+            this.houseRadius = 5;
         }
 
         if ((this.player.inventory['house_door'] || 0) <= 0) {
@@ -117,6 +134,7 @@ class IslandCrafter {
                 this.remotePlayers[peerId] = new Player(payload.x, payload.y);
                 this.remotePlayers[peerId].color = '#e74c3c';
             }
+            this.remotePlayers[peerId].lastSeen = Date.now();
             this.remotePlayers[peerId].x = payload.x;
             this.remotePlayers[peerId].y = payload.y;
             this.remotePlayers[peerId].facingX = payload.facingX;
@@ -163,6 +181,31 @@ class IslandCrafter {
 
         if (e.code === 'Space') {
             e.preventDefault();
+            
+            const dist = Math.hypot(this.player.x - this.npc.x, this.player.y - this.npc.y);
+            if (dist < 80 && this.player.selectedBlockId === 'empty_hand') {
+                this.npc.interact(this.player, (msg) => {
+                    this.ui.showNPCDialogue("Tom Plouk", msg);
+                }, (questId) => {
+                    if (questId === 'quest_1') {
+                        this.houseRadius = 8;
+                        this.savePlayer();
+                        if (this.player.x > 10000 * this.engine.cellSize - 500) {
+                            generateHouseRegion(this.engine, 10000, 10000, this.houseRadius);
+                        }
+                    }
+                    if (questId === 'quest_2') {
+                        this.houseRadius = 12;
+                        this.savePlayer();
+                        if (this.player.x > 10000 * this.engine.cellSize - 500) {
+                            generateHouseRegion(this.engine, 10000, 10000, this.houseRadius);
+                        }
+                    }
+                });
+                this.ui.updateHUD();
+                return;
+            }
+
             this.tryPlaceBlock();
         }
 
@@ -181,8 +224,8 @@ class IslandCrafter {
     }
 
     tryPlaceBlock() {
-        const targetX = this.player.x + this.player.facingX * this.engine.cellSize;
-        const targetY = this.player.y + this.player.facingY * this.engine.cellSize;
+        const targetX = this.player.x + this.player.facingX * (this.engine.cellSize);
+        const targetY = this.player.y + this.player.facingY * (this.engine.cellSize);
 
         const cellX = Math.floor(targetX / this.engine.cellSize);
         const cellY = Math.floor(targetY / this.engine.cellSize);
@@ -197,7 +240,7 @@ class IslandCrafter {
                 
                 const hx = 10000;
                 const hy = 10000;
-                generateHouseRegion(this.engine, hx, hy);
+                generateHouseRegion(this.engine, hx, hy, this.houseRadius);
                 
                 this.player.x = hx * this.engine.cellSize;
                 this.player.y = (hy + 4) * this.engine.cellSize;
@@ -325,6 +368,10 @@ class IslandCrafter {
                     }
                 } else {
                     this.engine.grid.setCell(cellX, cellY, blockObj);
+                    if (blockObj.solid && this.player.checkCollision(this.player.x, this.player.y, this.engine.grid, this.engine.cellSize)) {
+                        this.engine.grid.setCell(cellX, cellY, currentCell);
+                        return;
+                    }
                 }
 
                 this.network.broadcast({
@@ -353,7 +400,12 @@ class IslandCrafter {
 
     savePlayer() {
         localStorage.setItem('islandCrafter_player', JSON.stringify({
-            inventory: this.player.inventory
+            inventory: this.player.inventory,
+            x: this.player.x,
+            y: this.player.y,
+            lastOverworldX: this.lastOverworldX,
+            lastOverworldY: this.lastOverworldY,
+            houseRadius: this.houseRadius
         }));
     }
 
@@ -376,10 +428,18 @@ class IslandCrafter {
         } else if (this.state === 'PLAYING') {
             
             this.player.update(dt, engine.inputManager, engine.grid, engine.cellSize);
+            this.npc.update(dt, engine.grid, engine.cellSize);
+            
+            const now = Date.now();
+            for (const peerId in this.remotePlayers) {
+                if (now - (this.remotePlayers[peerId].lastSeen || now) > 5000) {
+                    delete this.remotePlayers[peerId];
+                }
+            }
             
             const isSpaceDown = engine.inputManager.isKeyDown('Space') || engine.inputManager.isKeyDown('Spacebar');
-            const targetX = this.player.x + this.player.facingX * engine.cellSize;
-            const targetY = this.player.y + this.player.facingY * engine.cellSize;
+            const targetX = this.player.x + this.player.facingX * (engine.cellSize);
+            const targetY = this.player.y + this.player.facingY * (engine.cellSize);
             const cellX = Math.floor(targetX / engine.cellSize);
             const cellY = Math.floor(targetY / engine.cellSize);
             const currentCell = engine.grid.getCell(cellX, cellY);
@@ -452,6 +512,12 @@ class IslandCrafter {
                 this.networkSyncTimer = 0;
             }
 
+            this.autoSaveTimer = (this.autoSaveTimer || 0) + dt;
+            if (this.autoSaveTimer > 5.0) {
+                this.savePlayer();
+                this.autoSaveTimer = 0;
+            }
+
             const targetCamX = engine.canvas.width / 2 - this.player.x * engine.camera.zoom;
             const targetCamY = engine.canvas.height / 2 - this.player.y * engine.camera.zoom;
             
@@ -493,6 +559,7 @@ class IslandCrafter {
         }
 
         this.player.draw(ctx);
+        this.npc.draw(ctx);
         for (const peerId in this.remotePlayers) {
             this.remotePlayers[peerId].draw(ctx);
         }

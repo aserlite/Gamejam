@@ -1,15 +1,11 @@
 import { BLOCKS } from './BlockDictionary.js';
 
-export function generateHouseRegion(engine, centerX, centerY) {
-    if (engine.grid.getCell(centerX, centerY)) return;
-
-    const radius = 7;
+export function generateHouseRegion(engine, centerX, centerY, radius = 3) {
+    const pad = radius + 6;
     
-    for (let x = -radius - 12; x <= radius + 12; x++) {
-        for (let y = -radius - 12; y <= radius + 12; y++) {
-            if (x < -radius || x > radius || y < -radius || y > radius) {
-                engine.grid.setCell(centerX + x, centerY + y, BLOCKS.abyss);
-            }
+    for (let x = -pad - 12; x <= pad + 12; x++) {
+        for (let y = -pad - 12; y <= pad + 12; y++) {
+            engine.grid.setCell(centerX + x, centerY + y, BLOCKS.abyss);
         }
     }
 
@@ -26,5 +22,5 @@ export function generateHouseRegion(engine, centerX, centerY) {
         }
     }
 
-    engine.grid.setCell(centerX, centerY + radius - 1, BLOCKS.house_exit);
+    engine.grid.setCell(centerX, centerY + radius, BLOCKS.house_exit);
 }
